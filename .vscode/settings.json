@@ -1,0 +1,8 @@
+{
+    "editor.inlayHints.enabled": "off",
+    "rust-analyzer.linkedProjects": [
+        "./lambda/Cargo.toml"
+    ],
+    "tasks.autoDetect": "off",
+    "tasks.runOnFolderOpen": true,
+}

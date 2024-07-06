@@ -1,0 +1,3 @@
+lambda/target
+**/zip
+*.terraform

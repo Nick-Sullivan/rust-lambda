@@ -1,0 +1,25 @@
+meta {
+  name: hello
+  type: http
+  seq: 2
+}
+
+post {
+  url: https://4fon6reol2.execute-api.eu-west-2.amazonaws.com/v1/hello
+  body: json
+  auth: none
+}
+
+query {
+  ~name: Nick2
+}
+
+body:json {
+  {
+    "name": "Nick2"
+  }
+}
+
+body:multipart-form {
+  name: hello
+}
