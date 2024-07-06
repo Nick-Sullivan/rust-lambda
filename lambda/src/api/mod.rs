@@ -1,2 +1,2 @@
-pub mod goodbye;
-pub mod hello;
+pub mod api;
+pub mod requests;
