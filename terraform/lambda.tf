@@ -24,7 +24,9 @@ resource "aws_lambda_function" "monolith" {
   ]
   environment {
     variables = {
-      HANDLER_TYPE = "hello"
+      HANDLER_TYPE = "hello",
+      TABLE_NAME = aws_dynamodb_table.storage.name,
+      REGION_NAME = local.region,
     }
   }
 }
@@ -34,4 +36,8 @@ resource "aws_iam_role" "monolith" {
   description         = "Allows Lambda run"
   assume_role_policy  = data.aws_iam_policy_document.lambda_assume_role.json
   managed_policy_arns = ["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"]
+  inline_policy {
+    name   = "DynamoWriteAccess"
+    policy = data.aws_iam_policy_document.access_dynamodb.json
+  }
 }

@@ -5,7 +5,4 @@
     ],
     "tasks.autoDetect": "off",
     "tasks.runOnFolderOpen": true,
-    "rust-analyzer.cargo.features": [
-        "is_local"
-    ],
 }

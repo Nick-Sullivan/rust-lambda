@@ -1,3 +1,4 @@
+use crate::domain::errors::DatabaseError;
 use crate::storage::database::INameDatabase;
 use std::collections::HashMap;
 
@@ -5,26 +6,28 @@ pub struct NameCounter {
     counts: HashMap<String, i32>,
 }
 
-#[cfg_attr(not(feature = "is_local"), allow(unused))]
+#[cfg_attr(not(test), allow(unused))]
 impl NameCounter {
-    pub fn new() -> Self {
-        NameCounter {
-            counts: HashMap::new(),
-        }
+    pub async fn new() -> Self {
+        let counts = HashMap::new();
+        NameCounter { counts }
     }
 }
 
 impl INameDatabase for NameCounter {
-    fn increment(&mut self, name: &str) {
+    async fn increment(&mut self, name: &str) -> Result<(), DatabaseError> {
         let count = self.counts.entry(name.to_string()).or_insert(0);
         *count += 1;
+        Ok(())
     }
 
-    fn get_count(&self, name: &str) -> i32 {
-        *self.counts.get(name).unwrap_or(&0)
+    async fn get_count(&self, name: &str) -> Result<i32, DatabaseError> {
+        let count = *self.counts.get(name).unwrap_or(&0);
+        Ok(count)
     }
 
-    fn clear(&mut self, name: &str) {
+    async fn clear(&mut self, name: &str) -> Result<(), DatabaseError> {
         self.counts.remove(name);
+        Ok(())
     }
 }

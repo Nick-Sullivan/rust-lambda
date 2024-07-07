@@ -1,4 +1,5 @@
 use crate::api::requests::{SayGoodbyeRequest, SayHelloRequest};
+use crate::domain::errors::HandlerError;
 use crate::service;
 use lambda_http::{tracing, Body, Error, Request, Response};
 use tracing::info;
@@ -25,7 +26,7 @@ pub async fn invoke(event: Request) -> Result<Response<Body>, Error> {
     info!("Path: {path}");
 
     let handler_type = HandlerType::from_str(&path)?;
-    let result = route(handler_type, body_str);
+    let result = route(handler_type, body_str).await;
 
     match result {
         Ok(message) => {
@@ -37,27 +38,28 @@ pub async fn invoke(event: Request) -> Result<Response<Body>, Error> {
             return Ok(resp);
         }
         Err(e) => {
+            let error_message = format!(r#"{{"error": "{}"}}"#, e);
             let resp = Response::builder()
                 .status(400)
                 .header("content-type", "application/json")
-                .body(e.into())
+                .body(error_message.into())
                 .map_err(Box::new)?;
             return Ok(resp);
         }
     }
 }
 
-fn route(handler_type: HandlerType, body: &[u8]) -> Result<String, String> {
+async fn route(handler_type: HandlerType, body: &[u8]) -> Result<String, HandlerError> {
     match handler_type {
         HandlerType::Hello => {
             let request = deserialise_body::<SayHelloRequest>(body)?;
             let command = request.to_command();
-            service::hello::handler(command)
+            service::hello::handler(&command).await
         }
         HandlerType::Goodbye => {
             let request = deserialise_body::<SayGoodbyeRequest>(body)?;
             let command = request.to_command();
-            service::goodbye::handler(command)
+            service::goodbye::handler(&command).await
         }
     }
 }
