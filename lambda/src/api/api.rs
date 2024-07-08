@@ -1,8 +1,7 @@
 use crate::api::requests::{SayGoodbyeRequest, SayHelloRequest};
 use crate::domain::errors::HandlerError;
 use crate::service;
-use lambda_http::{tracing, Body, Error, Request, Response};
-use tracing::info;
+use lambda_http::{tracing, Body, Error, Request, RequestExt, Response};
 
 enum HandlerType {
     Goodbye,
@@ -19,11 +18,56 @@ impl HandlerType {
     }
 }
 
+#[derive(serde::Deserialize)]
+struct Authorizer {
+    lambda: AuthorizerLambda,
+}
+
+#[derive(serde::Deserialize)]
+struct AuthorizerLambda {
+    claims: AuthorizerClaims,
+}
+
+#[derive(serde::Deserialize)]
+struct AuthorizerClaims {
+    email: String,
+    #[serde(rename = "cognito:username")]
+    username: String,
+}
+
 pub async fn invoke(event: Request) -> Result<Response<Body>, Error> {
     let _method = event.method().as_str();
     let path = event.uri().path();
     let body_str = event.body().as_ref();
-    info!("Path: {path}");
+    println!("Path: {path}");
+
+    let ctx = event.request_context().clone();
+    let ctx_str = serde_json::to_string(&ctx).unwrap();
+    println!("ctx_str: {ctx_str}");
+
+    let auth = ctx.authorizer();
+    match auth {
+        Some(auth) => {
+            let auth_str = serde_json::to_string(&auth).unwrap();
+            println!("auth_str: {auth_str}");
+
+            let authorizer: Result<Authorizer, _> = serde_json::from_str(&auth_str);
+            match authorizer {
+                Ok(authorizer) => {
+                    let email = authorizer.lambda.claims.email;
+                    let username = authorizer.lambda.claims.username;
+                    println!("Email: {email}");
+                    println!("Username: {username}");
+                }
+                Err(e) => {
+                    println!("Error parsing authorizer: {e}");
+                }
+            }
+        }
+        None => {
+            println!("No authorizer found");
+        }
+    }
 
     let handler_type = HandlerType::from_str(&path)?;
     let result = route(handler_type, body_str).await;

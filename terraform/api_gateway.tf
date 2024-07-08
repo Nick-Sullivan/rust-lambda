@@ -4,6 +4,13 @@ resource "aws_api_gateway_rest_api" "gateway" {
   name = local.prefix
 }
 
+resource "aws_api_gateway_authorizer" "gateway" {
+  name          = "cognito"
+  rest_api_id   = aws_api_gateway_rest_api.gateway.id
+  type          = "COGNITO_USER_POOLS"
+  provider_arns = [aws_cognito_user_pool.users.arn]
+}
+
 resource "aws_api_gateway_deployment" "gateway" {
   rest_api_id = aws_api_gateway_rest_api.gateway.id
   description = "Terraform deployment"

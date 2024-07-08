@@ -5,13 +5,17 @@ meta {
 }
 
 post {
-  url: https://4fon6reol2.execute-api.eu-west-2.amazonaws.com/v1/goodbye
+  url: {{API_GATEWAY_URL}}/goodbye
   body: json
-  auth: none
+  auth: bearer
 }
 
 query {
   ~name: Nick2
+}
+
+auth:bearer {
+  token: {{ID_TOKEN}}
 }
 
 body:json {

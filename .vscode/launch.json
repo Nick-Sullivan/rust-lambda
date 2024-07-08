@@ -34,6 +34,13 @@
                 "AWS_REGION": "ap-southeast-2",
                 "TABLE_NAME": "RustLambda-Dev",
             }
-        }
+        },
+        {
+            "name": "Create token",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/authenticate.py",
+            "console": "integratedTerminal"
+        },
     ]
 }
