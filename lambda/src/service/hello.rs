@@ -9,15 +9,17 @@ pub async fn handler(command: &SayHelloCommand) -> Result<String, HandlerError> 
     }
     let db = get_database().await;
     let mut db_lock = db.lock().await;
-    db_lock.increment(&command.name).await?;
-    let count = db_lock.get_count(&command.name).await?;
-    let message = format!("Hello {0}, {1} times", command.name, count);
+    let mut item = db_lock.get(&command.name).await?;
+    item.count += 1;
+    let message = format!("Hello {0}, {1} times", command.name, item.count);
+    db_lock.save(&item).await?;
     Ok(message)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::database::NameCount;
 
     #[tokio::test]
     async fn test_initial_hello() {
@@ -34,9 +36,13 @@ mod tests {
     #[tokio::test]
     async fn test_second_hello() {
         let name = "test_second_hello".to_string();
+        let item = NameCount {
+            name: name.to_string(),
+            count: 1,
+        };
         let db = get_database().await;
         let mut db_lock = db.lock().await;
-        let _ = db_lock.increment(&name).await;
+        let _ = db_lock.save(&item).await;
         drop(db_lock);
 
         let request = SayHelloCommand { name };

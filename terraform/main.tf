@@ -21,7 +21,7 @@ provider "aws" {
 data "aws_caller_identity" "identity" {}
 
 locals {
-  region                    = "ap-southeast-2"
+  region                    = "eu-west-2"
   prefix                    = "RustLambda-${title(var.environment)}"
   prefix_lower              = "rust-lambda-${lower(var.environment)}"
   prefix_parameter          = "/RustLambda/${title(var.environment)}"

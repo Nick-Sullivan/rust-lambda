@@ -9,15 +9,16 @@ pub async fn handler(command: &SayGoodbyeCommand) -> Result<String, HandlerError
     }
     let db = get_database().await;
     let mut db_lock = db.lock().await;
-    let count = db_lock.get_count(&command.name).await?;
+    let item = db_lock.get(&command.name).await?;
+    let message = format!("Goodbye {0}, {1} times", command.name, item.count);
     db_lock.clear(&command.name).await?;
-    let message = format!("Goodbye {0}, {1} times", command.name, count);
     Ok(message)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::database::NameCount;
     use std::mem::drop;
 
     #[tokio::test]
@@ -35,9 +36,13 @@ mod tests {
     #[tokio::test]
     async fn test_second_goodbye() {
         let name = "test_second_goodbye".to_string();
+        let item = NameCount {
+            name: name.to_string(),
+            count: 1,
+        };
         let db = get_database().await;
         let mut db_lock = db.lock().await;
-        let _ = db_lock.increment(&name).await;
+        let _ = db_lock.save(&item).await;
         drop(db_lock);
 
         let request = SayGoodbyeCommand { name };

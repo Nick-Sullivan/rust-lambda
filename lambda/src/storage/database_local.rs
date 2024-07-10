@@ -1,29 +1,34 @@
 use crate::domain::errors::DatabaseError;
-use crate::storage::database::INameDatabase;
+use crate::storage::database::{INameDatabase, NameCount};
 use std::collections::HashMap;
 
-pub struct NameCounter {
-    counts: HashMap<String, i32>,
+pub struct Database {
+    counts: HashMap<String, NameCount>,
 }
 
 #[cfg_attr(not(test), allow(unused))]
-impl NameCounter {
+impl Database {
     pub async fn new() -> Self {
         let counts = HashMap::new();
-        NameCounter { counts }
+        Database { counts }
     }
 }
 
-impl INameDatabase for NameCounter {
-    async fn increment(&mut self, name: &str) -> Result<(), DatabaseError> {
-        let count = self.counts.entry(name.to_string()).or_insert(0);
-        *count += 1;
-        Ok(())
+impl INameDatabase for Database {
+    async fn get(&self, name: &str) -> Result<NameCount, DatabaseError> {
+        let item = self.counts.get(name);
+        match item {
+            Some(item) => Ok(item.clone()),
+            None => Ok(NameCount {
+                name: name.to_string(),
+                count: 0,
+            }),
+        }
     }
 
-    async fn get_count(&self, name: &str) -> Result<i32, DatabaseError> {
-        let count = *self.counts.get(name).unwrap_or(&0);
-        Ok(count)
+    async fn save(&mut self, item: &NameCount) -> Result<(), DatabaseError> {
+        self.counts.insert(item.name.clone(), item.clone());
+        Ok(())
     }
 
     async fn clear(&mut self, name: &str) -> Result<(), DatabaseError> {

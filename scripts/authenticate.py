@@ -31,7 +31,7 @@ def load_secrets():
         f"{prefix}/Cognito/UserPoolId": "POOL_ID",
         f"{prefix}/Cognito/ClientId": "CLIENT_ID",
     }
-    ssm_client = boto3.client("ssm")
+    ssm_client = boto3.client("ssm", region_name="eu-west-2")
     parameters = ssm_client.get_parameters(
         Names=list(parameter_names), WithDecryption=True
     )
