@@ -1,4 +1,4 @@
-use crate::domain::errors::DatabaseError;
+use crate::domain::errors::LogicError;
 
 #[derive(Clone)]
 pub struct NameCount {
@@ -17,7 +17,7 @@ impl NameCount {
     }
 }
 pub trait INameDatabase {
-    async fn get(&self, name: &str) -> Result<NameCount, DatabaseError>;
-    async fn save(&mut self, item: &NameCount) -> Result<(), DatabaseError>;
-    async fn clear(&mut self, name: &str) -> Result<(), DatabaseError>;
+    async fn get(&self, name: &str) -> Result<NameCount, LogicError>;
+    async fn save(&mut self, item: &NameCount) -> Result<(), LogicError>;
+    async fn clear(&mut self, name: &str) -> Result<(), LogicError>;
 }

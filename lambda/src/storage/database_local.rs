@@ -1,4 +1,4 @@
-use crate::domain::errors::DatabaseError;
+use crate::domain::errors::LogicError;
 use crate::storage::database::{INameDatabase, NameCount};
 use std::collections::HashMap;
 
@@ -15,7 +15,7 @@ impl Database {
 }
 
 impl INameDatabase for Database {
-    async fn get(&self, name: &str) -> Result<NameCount, DatabaseError> {
+    async fn get(&self, name: &str) -> Result<NameCount, LogicError> {
         let item = self.counts.get(name);
         match item {
             Some(item) => Ok(item.clone()),
@@ -23,12 +23,12 @@ impl INameDatabase for Database {
         }
     }
 
-    async fn save(&mut self, item: &NameCount) -> Result<(), DatabaseError> {
+    async fn save(&mut self, item: &NameCount) -> Result<(), LogicError> {
         self.counts.insert(item.name.clone(), item.clone());
         Ok(())
     }
 
-    async fn clear(&mut self, name: &str) -> Result<(), DatabaseError> {
+    async fn clear(&mut self, name: &str) -> Result<(), LogicError> {
         self.counts.remove(name);
         Ok(())
     }

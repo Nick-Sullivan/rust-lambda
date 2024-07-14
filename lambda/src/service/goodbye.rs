@@ -1,11 +1,11 @@
 use crate::dependency_injection::get_database;
 use crate::domain::commands::SayGoodbyeCommand;
-use crate::domain::errors::HandlerError;
+use crate::domain::errors::LogicError;
 use crate::storage::database::INameDatabase;
 
-pub async fn handler(command: &SayGoodbyeCommand) -> Result<String, HandlerError> {
+pub async fn handler(command: &SayGoodbyeCommand) -> Result<String, LogicError> {
     if command.name == "Nick" {
-        return Err(HandlerError::NotAllowed);
+        return Err(LogicError::NotAllowed);
     }
     let db = get_database().await;
     let mut db_lock = db.lock().await;
@@ -61,6 +61,6 @@ mod tests {
         let request = SayGoodbyeCommand { name };
         let result = handler(&request).await;
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), HandlerError::NotAllowed);
+        assert_eq!(result.unwrap_err(), LogicError::NotAllowed);
     }
 }

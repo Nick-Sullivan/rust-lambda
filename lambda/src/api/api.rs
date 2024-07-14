@@ -1,7 +1,8 @@
+use crate::api::auth::get_auth_claims;
 use crate::api::requests::{SayGoodbyeRequest, SayHelloRequest};
-use crate::domain::errors::HandlerError;
+use crate::domain::errors::LogicError;
 use crate::service;
-use lambda_http::{tracing, Body, Error, Request, RequestExt, Response};
+use lambda_http::{Body, Error, Request, Response};
 
 enum HandlerType {
     Goodbye,
@@ -18,82 +19,34 @@ impl HandlerType {
     }
 }
 
-#[derive(serde::Deserialize)]
-struct Authorizer {
-    lambda: AuthorizerLambda,
-}
-
-#[derive(serde::Deserialize)]
-struct AuthorizerLambda {
-    claims: AuthorizerClaims,
-}
-
-#[derive(serde::Deserialize)]
-struct AuthorizerClaims {
-    email: String,
-    #[serde(rename = "cognito:username")]
-    username: String,
-}
-
 pub async fn invoke(event: Request) -> Result<Response<Body>, Error> {
-    let _method = event.method().as_str();
     let path = event.uri().path();
-    let body_str = event.body().as_ref();
     println!("Path: {path}");
 
-    let ctx = event.request_context().clone();
-    let ctx_str = serde_json::to_string(&ctx).unwrap();
-    println!("ctx_str: {ctx_str}");
-
-    let auth = ctx.authorizer();
-    match auth {
-        Some(auth) => {
-            let auth_str = serde_json::to_string(&auth).unwrap();
-            println!("auth_str: {auth_str}");
-
-            let authorizer: Result<Authorizer, _> = serde_json::from_str(&auth_str);
-            match authorizer {
-                Ok(authorizer) => {
-                    let email = authorizer.lambda.claims.email;
-                    let username = authorizer.lambda.claims.username;
-                    println!("Email: {email}");
-                    println!("Username: {username}");
-                }
-                Err(e) => {
-                    println!("Error parsing authorizer: {e}");
-                }
-            }
-        }
-        None => {
-            println!("No authorizer found");
-        }
-    }
+    let auth_claims = get_auth_claims(&event)?;
+    let email = auth_claims.email.clone();
+    let username = auth_claims.username.clone();
+    println!("Email: {email}");
+    println!("Username: {username}");
 
     let handler_type = HandlerType::from_str(&path)?;
-    let result = route(handler_type, body_str).await;
+    let body_str = event.body().as_ref();
+    let max_retries = 10;
 
-    match result {
-        Ok(message) => {
-            let resp = Response::builder()
-                .status(200)
-                .header("content-type", "application/json")
-                .body(message.into())
-                .map_err(Box::new)?;
-            return Ok(resp);
+    for _ in 0..max_retries {
+        let result = route(&handler_type, body_str).await;
+        if let Err(LogicError::ConditionalCheckFailed(_)) = result {
+            continue;
         }
-        Err(e) => {
-            let error_message = format!(r#"{{"error": "{}"}}"#, e);
-            let resp = Response::builder()
-                .status(400)
-                .header("content-type", "application/json")
-                .body(error_message.into())
-                .map_err(Box::new)?;
-            return Ok(resp);
-        }
+        return build_response(result);
     }
+
+    build_response(Err(LogicError::ConditionalCheckFailed(
+        "Max retries reached".into(),
+    )))
 }
 
-async fn route(handler_type: HandlerType, body: &[u8]) -> Result<String, HandlerError> {
+async fn route(handler_type: &HandlerType, body: &[u8]) -> Result<String, LogicError> {
     match handler_type {
         HandlerType::Hello => {
             let request = deserialise_body::<SayHelloRequest>(body)?;
@@ -108,17 +61,31 @@ async fn route(handler_type: HandlerType, body: &[u8]) -> Result<String, Handler
     }
 }
 
-fn deserialise_body<T>(body_str: &[u8]) -> Result<T, String>
+fn deserialise_body<T>(body_str: &[u8]) -> Result<T, LogicError>
 where
     T: serde::de::DeserializeOwned,
 {
-    serde_json::from_slice(body_str).map_err(|e| e.to_string())
+    serde_json::from_slice(body_str).map_err(|e| LogicError::DeserializationError(e.to_string()))
 }
 
-// fn lookup_handler(handler_type: HandlerType) -> fn(&str) -> Result<String, String> {
-//     match handler_type {
-//         HandlerType::Hello => api::hello::handler,
-//         HandlerType::Goodbye => api::goodbye::handler,
-//         HandlerType::Local => api::hello::handler,
-//     }
-// }
+fn build_response(result: Result<String, LogicError>) -> Result<Response<Body>, Error> {
+    match result {
+        Ok(message) => {
+            let resp = Response::builder()
+                .status(200)
+                .header("content-type", "application/json")
+                .body(message.into())
+                .map_err(|e| LogicError::SerializationError(e.to_string()))?;
+            Ok(resp)
+        }
+        Err(e) => {
+            let error_message = format!(r#"{{"error": "{}"}}"#, e);
+            let resp = Response::builder()
+                .status(400)
+                .header("content-type", "application/json")
+                .body(error_message.into())
+                .map_err(|e| LogicError::SerializationError(e.to_string()))?;
+            Ok(resp)
+        }
+    }
+}

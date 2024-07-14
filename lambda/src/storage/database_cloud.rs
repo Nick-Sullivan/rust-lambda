@@ -1,4 +1,4 @@
-use crate::domain::errors::DatabaseError;
+use crate::domain::errors::LogicError;
 use crate::storage::database::{INameDatabase, NameCount};
 use aws_config;
 use aws_config::meta::region::RegionProviderChain;
@@ -26,9 +26,8 @@ impl Database {
         Database { client, table_name }
     }
 
-    async fn create(&mut self, item: &NameCount) -> Result<(), DatabaseError> {
-        let response = self
-            .client
+    async fn create(&mut self, item: &NameCount) -> Result<(), LogicError> {
+        self.client
             .update_item()
             .table_name(&self.table_name)
             .key("name", AttributeValue::S(item.name.clone()))
@@ -37,17 +36,14 @@ impl Database {
             .expression_attribute_values(":count_col", AttributeValue::N(item.count.to_string()))
             .expression_attribute_values(":version", AttributeValue::N(item.version.to_string()))
             .send()
-            .await;
-        match response {
-            Ok(_) => Ok(()),
-            Err(err) => Err(self.parse_update_error(err)),
-        }
+            .await
+            .map_err(|e| self.parse_update_error(e))?;
+        Ok(())
     }
 
-    async fn update(&mut self, item: &NameCount) -> Result<(), DatabaseError> {
+    async fn update(&mut self, item: &NameCount) -> Result<(), LogicError> {
         let old_version = item.version - 1;
-        let response = self
-            .client
+        self.client
             .update_item()
             .table_name(&self.table_name)
             .key("name", AttributeValue::S(item.name.clone()))
@@ -57,29 +53,24 @@ impl Database {
             .expression_attribute_values(":version", AttributeValue::N(item.version.to_string()))
             .expression_attribute_values(":old_version", AttributeValue::N(old_version.to_string()))
             .send()
-            .await;
-        match response {
-            Ok(_) => Ok(()),
-            Err(err) => Err(self.parse_update_error(err)),
-        }
+            .await
+            .map_err(|e| self.parse_update_error(e))?;
+        Ok(())
     }
 
-    fn parse_update_error(&self, err: SdkError<UpdateItemError, Response>) -> DatabaseError {
+    fn parse_update_error(&self, err: SdkError<UpdateItemError, Response>) -> LogicError {
         match err {
             SdkError::ServiceError(se) => match se.err() {
                 UpdateItemError::ConditionalCheckFailedException(err) => {
-                    DatabaseError::ConditionalCheckFailed(err.to_string())
+                    LogicError::ConditionalCheckFailed(err.to_string())
                 }
-                _ => DatabaseError::UpdateItemError(se.err().to_string()),
+                _ => LogicError::UpdateItemError(se.err().to_string()),
             },
-            _ => DatabaseError::UpdateItemError(err.to_string()),
+            _ => LogicError::UpdateItemError(err.to_string()),
         }
     }
 
-    fn parse_item(
-        &self,
-        item: &HashMap<String, AttributeValue>,
-    ) -> Result<NameCount, DatabaseError> {
+    fn parse_item(&self, item: &HashMap<String, AttributeValue>) -> Result<NameCount, LogicError> {
         let count: i32 = Self::get_parsed_value(item, "count_col")?;
         let version: i32 = Self::get_parsed_value(item, "version")?;
         let name: String = Self::get_parsed_value(item, "name")?;
@@ -93,18 +84,18 @@ impl Database {
     fn get_parsed_value<T: std::str::FromStr>(
         item: &HashMap<String, AttributeValue>,
         key: &str,
-    ) -> Result<T, DatabaseError> {
-        let value = item.get(key).ok_or(DatabaseError::ParseError(
+    ) -> Result<T, LogicError> {
+        let value = item.get(key).ok_or(LogicError::ParseItemError(
             "Attribute {key} not found".to_string(),
         ))?;
         match value {
             AttributeValue::N(val) => val
                 .parse::<T>()
-                .map_err(|_| DatabaseError::ParseError("Unable to parse {key}".to_string())),
+                .map_err(|_| LogicError::ParseItemError("Unable to parse {key}".to_string())),
             AttributeValue::S(val) => val
                 .parse::<T>()
-                .map_err(|_| DatabaseError::ParseError("Unable to parse {key}".to_string())),
-            _ => Err(DatabaseError::ParseError(
+                .map_err(|_| LogicError::ParseItemError("Unable to parse {key}".to_string())),
+            _ => Err(LogicError::ParseItemError(
                 "Unsupported type to parse argument {key}".to_string(),
             )),
         }
@@ -112,48 +103,39 @@ impl Database {
 }
 
 impl INameDatabase for Database {
-    async fn get(&self, name: &str) -> Result<NameCount, DatabaseError> {
+    async fn get(&self, name: &str) -> Result<NameCount, LogicError> {
         let response = self
             .client
             .get_item()
             .table_name(&self.table_name)
             .key("name", AttributeValue::S(name.to_string()))
             .send()
-            .await;
+            .await
+            .map_err(|err| LogicError::GetItemError(err.to_string()))?;
 
-        let item_option = match response {
-            Ok(resp) => resp.item,
-            Err(err) => return Err(DatabaseError::ConnectionError(err.to_string())),
+        let item = match response.item {
+            Some(item) => self.parse_item(&item)?,
+            None => NameCount::new(name),
         };
-
-        let item = match item_option {
-            Some(item) => item,
-            None => return Ok(NameCount::new(name)),
-        };
-        let mut item = self.parse_item(&item)?;
-        item.version += 1;
         Ok(item)
     }
 
-    async fn save(&mut self, item: &NameCount) -> Result<(), DatabaseError> {
-        if item.version == 0 {
+    async fn save(&mut self, item: &NameCount) -> Result<(), LogicError> {
+        if item.version == 1 {
             self.create(item).await
         } else {
             self.update(item).await
         }
     }
 
-    async fn clear(&mut self, name: &str) -> Result<(), DatabaseError> {
-        let response = self
-            .client
+    async fn clear(&mut self, name: &str) -> Result<(), LogicError> {
+        self.client
             .delete_item()
             .table_name(&self.table_name)
             .key("name", AttributeValue::S(name.to_string()))
             .send()
-            .await;
-        match response {
-            Ok(_) => Ok(()),
-            Err(err) => Err(DatabaseError::ConnectionError(err.to_string())),
-        }
+            .await
+            .map_err(|err| LogicError::DeleteItemError(err.to_string()))?;
+        Ok(())
     }
 }
