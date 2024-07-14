@@ -71,4 +71,3 @@ resource "aws_cognito_user" "automated_tester" {
     email_verified = true
   }
 }
-

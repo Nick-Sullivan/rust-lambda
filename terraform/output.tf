@@ -3,6 +3,11 @@ output "gateway_url" {
   value       = aws_api_gateway_stage.gateway.invoke_url
 }
 
+output "gateway_url_websocket" {
+  description = "URL for invoking API Gateway websocket."
+  value       = aws_apigatewayv2_stage.websocket.invoke_url
+}
+
 output "client_id" {
   description = "Client ID for AWS Cognito."
   value       = aws_cognito_user_pool_client.users.id

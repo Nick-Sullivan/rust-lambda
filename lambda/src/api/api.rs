@@ -20,8 +20,10 @@ impl HandlerType {
 }
 
 pub async fn invoke(event: Request) -> Result<Response<Body>, Error> {
+    let method = event.method();
     let path = event.uri().path();
     println!("Path: {path}");
+    println!("Method: {method}");
 
     let auth_claims = get_auth_claims(&event)?;
     let email = auth_claims.email.clone();

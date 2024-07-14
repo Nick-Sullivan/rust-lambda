@@ -1,5 +1,4 @@
 
-
 resource "aws_api_gateway_rest_api" "gateway" {
   name = local.prefix
 }
@@ -37,17 +36,6 @@ resource "aws_api_gateway_stage" "gateway" {
   stage_name    = "v1"
 }
 
-# resource "aws_lambda_permission" "gateway" {
-#   depends_on    = [aws_api_gateway_deployment.gateway]
-#   for_each      = local.lambda_names
-#   function_name = each.value
-#   statement_id  = "AllowExecutionFromAPIGateway"
-#   action        = "lambda:InvokeFunction"
-#   principal     = "apigateway.amazonaws.com"
-#   # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
-#   source_arn = "${aws_api_gateway_rest_api.gateway.execution_arn}/*"
-# }
-
 resource "aws_lambda_permission" "gateway" {
   depends_on    = [aws_api_gateway_deployment.gateway]
   function_name = local.prefix
@@ -57,8 +45,6 @@ resource "aws_lambda_permission" "gateway" {
   # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
   source_arn = "${aws_api_gateway_rest_api.gateway.execution_arn}/*"
 }
-
-// LOGGING
 
 resource "aws_api_gateway_account" "gateway" {
   cloudwatch_role_arn = aws_iam_role.write_to_cloudwatch.arn

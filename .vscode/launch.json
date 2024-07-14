@@ -42,5 +42,12 @@
             "program": "scripts/authenticate.py",
             "console": "integratedTerminal"
         },
+        {
+            "name": "Connect to websocket",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/connect_to_websocket.py",
+            "console": "integratedTerminal"
+        },
     ]
 }

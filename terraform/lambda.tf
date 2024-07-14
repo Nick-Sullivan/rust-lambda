@@ -1,16 +1,8 @@
 
-
-# resource "aws_cloudwatch_log_group" "all" {
-#   for_each          = local.lambda_names
-#   name              = "/aws/lambda/${each.value}"
-#   retention_in_days = 90
-# }
-
 resource "aws_cloudwatch_log_group" "monolith" {
   name              = "/aws/lambda/${local.prefix}"
   retention_in_days = 90
 }
-
 
 resource "aws_lambda_function" "monolith" {
   package_type  = "Image"
@@ -24,9 +16,10 @@ resource "aws_lambda_function" "monolith" {
   ]
   environment {
     variables = {
-      HANDLER_TYPE = "hello",
-      TABLE_NAME = aws_dynamodb_table.storage.name,
-      REGION_NAME = local.region,
+      HANDLER_TYPE    = "hello",
+      TABLE_NAME      = aws_dynamodb_table.storage.name,
+      REGION_NAME     = local.region,
+      API_GATEWAY_URL = aws_apigatewayv2_stage.websocket.invoke_url,
     }
   }
 }
@@ -39,5 +32,20 @@ resource "aws_iam_role" "monolith" {
   inline_policy {
     name   = "DynamoWriteAccess"
     policy = data.aws_iam_policy_document.access_dynamodb.json
+  }
+  inline_policy {
+    name   = "ApiGatewayConnections"
+    policy = data.aws_iam_policy_document.api_connections.json
+  }
+}
+
+data "aws_iam_policy_document" "api_connections" {
+  # Allow Lambda to send messages to API gateway connections
+  statement {
+    actions = [
+      "execute-api:ManageConnections",
+    ]
+    effect    = "Allow"
+    resources = ["arn:aws:execute-api:${local.region}:${local.aws_account_id}:${aws_apigatewayv2_api.websocket.id}/*"]
   }
 }

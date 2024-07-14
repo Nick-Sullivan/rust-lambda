@@ -19,6 +19,7 @@ test = []
 
 [dependencies]
 aws-config = "1.5.4"
+aws-sdk-apigatewaymanagement = "1.35.0"
 aws-sdk-dynamodb = "1.37.0"
 aws-smithy-runtime-api = "1.7.1"
 lambda_http = "0.12.0"
