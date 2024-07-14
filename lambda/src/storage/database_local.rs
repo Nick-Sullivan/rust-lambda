@@ -19,10 +19,7 @@ impl INameDatabase for Database {
         let item = self.counts.get(name);
         match item {
             Some(item) => Ok(item.clone()),
-            None => Ok(NameCount {
-                name: name.to_string(),
-                count: 0,
-            }),
+            None => Ok(NameCount::new(name)),
         }
     }
 

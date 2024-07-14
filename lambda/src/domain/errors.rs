@@ -3,19 +3,23 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum DatabaseError {
-    NotFound,
     ConnectionError(String),
-    // InvalidInput(String),
+    UpdateItemError(String),
+    ParseError(String),
+    ConditionalCheckFailed(String),
 }
 
 impl fmt::Display for DatabaseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            DatabaseError::NotFound => write!(f, "Item not found"),
-            DatabaseError::ConnectionError(ref cause) => {
-                write!(f, "Failed to connect to the database: {}", cause)
+            DatabaseError::ConnectionError(ref msg) => {
+                write!(f, "[ConnectionError] {}", msg)
             }
-            // DatabaseError::InvalidInput(ref cause) => write!(f, "Invalid input: {}", cause),
+            DatabaseError::ParseError(ref msg) => write!(f, "[ParseError] {}", msg),
+            DatabaseError::UpdateItemError(ref msg) => write!(f, "[UpdateItemError] {}", msg),
+            DatabaseError::ConditionalCheckFailed(ref msg) => {
+                write!(f, "[ConditionalCheckFailed] {}", msg)
+            }
         }
     }
 }

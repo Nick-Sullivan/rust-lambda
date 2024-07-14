@@ -39,6 +39,7 @@ mod tests {
         let item = NameCount {
             name: name.to_string(),
             count: 1,
+            version: 0,
         };
         let db = get_database().await;
         let mut db_lock = db.lock().await;
