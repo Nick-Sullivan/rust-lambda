@@ -9,8 +9,10 @@ pub enum LogicError {
     GetItemError(String),
     NotAllowed,
     ParseItemError(String),
+    RestError(String),
     SerializationError(String),
     UpdateItemError(String),
+    WebsocketError(String),
 }
 
 impl fmt::Display for LogicError {
@@ -26,8 +28,10 @@ impl fmt::Display for LogicError {
             LogicError::GetItemError(ref msg) => write!(f, "[GetItemError] {}", msg),
             LogicError::NotAllowed => write!(f, "[NotAllowed]"),
             LogicError::ParseItemError(ref msg) => write!(f, "[ParseError] {}", msg),
+            LogicError::RestError(ref msg) => write!(f, "[RestError] {}", msg),
             LogicError::SerializationError(ref msg) => write!(f, "[SerializationError] {}", msg),
             LogicError::UpdateItemError(ref msg) => write!(f, "[UpdateItemError] {}", msg),
+            LogicError::WebsocketError(ref msg) => write!(f, "[WebsocketError] {}", msg),
         }
     }
 }

@@ -1,8 +1,8 @@
-use crate::api::auth::get_auth_claims;
 use crate::api::requests::{SayGoodbyeRequest, SayHelloRequest};
 use crate::domain::errors::LogicError;
 use crate::service;
-use lambda_http::{Body, Error, Request, Response};
+use lambda_http::aws_lambda_events::apigw::ApiGatewayProxyRequestContext;
+use lambda_http::{Body, Error, Response};
 
 enum HandlerType {
     Goodbye,
@@ -19,24 +19,36 @@ impl HandlerType {
     }
 }
 
-pub async fn invoke(event: Request) -> Result<Response<Body>, Error> {
-    let method = event.method();
-    let path = event.uri().path();
+pub async fn invoke(
+    body: &Body,
+    context: &ApiGatewayProxyRequestContext,
+) -> Result<Response<Body>, Error> {
+    let path = context
+        .path
+        .clone()
+        .ok_or(LogicError::RestError("No path".to_string()))?;
+    let email = context.authorizer.fields["claims"]["email"]
+        .as_str()
+        .ok_or(LogicError::RestError("No email".to_string()))?;
+    let username = context.authorizer.fields["claims"]["cognito:username"]
+        .as_str()
+        .ok_or(LogicError::RestError("No username".to_string()))?;
     println!("Path: {path}");
-    println!("Method: {method}");
-
-    let auth_claims = get_auth_claims(&event)?;
-    let email = auth_claims.email.clone();
-    let username = auth_claims.username.clone();
     println!("Email: {email}");
     println!("Username: {username}");
 
     let handler_type = HandlerType::from_str(&path)?;
-    let body_str = event.body().as_ref();
+    let body_str = match body {
+        Body::Empty => Ok("".to_string()),
+        Body::Text(s) => Ok(s.to_string()),
+        Body::Binary(_) => Err(LogicError::WebsocketError(
+            "Binary not supported".to_string(),
+        )),
+    }?;
     let max_retries = 10;
 
     for _ in 0..max_retries {
-        let result = route(&handler_type, body_str).await;
+        let result = route(&handler_type, body_str.as_bytes()).await;
         if let Err(LogicError::ConditionalCheckFailed(_)) = result {
             continue;
         }

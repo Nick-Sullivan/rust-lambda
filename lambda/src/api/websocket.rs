@@ -1,37 +1,40 @@
 use aws_config;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_apigatewaymanagement::{config::Region, primitives::Blob, Client};
-use lambda_http::{Body, Error, Request, RequestExt, Response};
+use lambda_http::{
+    aws_lambda_events::apigw::ApiGatewayWebsocketProxyRequestContext, Body, Error, Response,
+};
 use std::env;
 
-#[derive(serde::Deserialize)]
-struct Context {
-    #[serde(rename = "routeKey")]
-    route_key: String,
-    #[serde(rename = "connectionId")]
-    connection_id: String,
-}
+use crate::domain::errors::LogicError;
 
-pub async fn invoke(event: Request) -> Result<Response<(Body)>, Error> {
-    let method = event.method();
-    println!("Method: {method}");
-    let path = event.uri().path();
-    println!("Path: {path}");
-    let ctx = event.request_context().clone();
-    let ctx_str = serde_json::to_string(&ctx)?;
-    println!("ctx_str: {ctx_str}");
-    let context: Context = serde_json::from_str(&ctx_str)?;
-    let route_key = context.route_key.clone();
+pub async fn invoke(
+    body: &Body,
+    context: &ApiGatewayWebsocketProxyRequestContext,
+) -> Result<Response<Body>, Error> {
+    let route_key = context
+        .route_key
+        .clone()
+        .ok_or(LogicError::WebsocketError("No route key".to_string()))?;
+    let connection_id = context
+        .connection_id
+        .clone()
+        .ok_or(LogicError::WebsocketError("No connection ID".to_string()))?;
     println!("route_key: {route_key}");
-    let body = event.body();
-    let body_str = std::str::from_utf8(body)?;
-    println!("Body: {body_str}");
-    let connection_id = context.connection_id.clone();
     println!("connection_id: {connection_id}");
 
     if route_key == "$connect" || route_key == "$disconnect" {
         return Ok(Response::new(Body::Empty));
     }
+
+    let body_str = match body {
+        Body::Empty => Ok("".to_string()),
+        Body::Text(s) => Ok(s.to_string()),
+        Body::Binary(_) => Err(LogicError::WebsocketError(
+            "Binary not supported".to_string(),
+        )),
+    }?;
+    println!("Body: {body_str}");
 
     // Send response
     let region_name = env::var("AWS_REGION")?;
@@ -50,7 +53,7 @@ pub async fn invoke(event: Request) -> Result<Response<(Body)>, Error> {
 
     let _response = client
         .post_to_connection()
-        .connection_id(context.connection_id.clone())
+        .connection_id(connection_id.clone())
         .data(Blob::new(message.as_bytes().to_vec()))
         .send()
         .await?;
