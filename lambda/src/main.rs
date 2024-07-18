@@ -1,6 +1,7 @@
 mod api;
 mod dependency_injection;
 mod domain;
+mod notifier;
 mod service;
 mod storage;
 use lambda_http::request::RequestContext;

@@ -7,7 +7,7 @@ def main():
 
 
 async def connect():
-    uri = "wss://gg7rnclr3f.execute-api.eu-west-2.amazonaws.com/production"
+    uri = "wss://8i3o8zs7oc.execute-api.eu-west-2.amazonaws.com/production"
     async with websockets.connect(uri) as websocket:
         await websocket.send("Hello, WebSocket!")
         while True:

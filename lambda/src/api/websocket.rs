@@ -1,12 +1,27 @@
-use aws_config;
-use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_apigatewaymanagement::{config::Region, primitives::Blob, Client};
+use crate::api::requests::{SayGoodbyeRequest, SayHelloRequest};
+use crate::dependency_injection::get_notifier;
+use crate::notifier::notifier::INotifier;
+use crate::{domain::errors::LogicError, service};
 use lambda_http::{
     aws_lambda_events::apigw::ApiGatewayWebsocketProxyRequestContext, Body, Error, Response,
 };
-use std::env;
 
-use crate::domain::errors::LogicError;
+enum HandlerType {
+    Connect,
+    Disconnect,
+    Default,
+}
+
+impl HandlerType {
+    fn from_str(s: &str) -> Result<HandlerType, String> {
+        match s {
+            "$connect" => Ok(HandlerType::Connect),
+            "$disconnect" => Ok(HandlerType::Disconnect),
+            "$default" => Ok(HandlerType::Default),
+            _ => Err("Invalid handler type".to_owned()),
+        }
+    }
+}
 
 pub async fn invoke(
     body: &Body,
@@ -23,10 +38,6 @@ pub async fn invoke(
     println!("route_key: {route_key}");
     println!("connection_id: {connection_id}");
 
-    if route_key == "$connect" || route_key == "$disconnect" {
-        return Ok(Response::new(Body::Empty));
-    }
-
     let body_str = match body {
         Body::Empty => Ok("".to_string()),
         Body::Text(s) => Ok(s.to_string()),
@@ -35,28 +46,38 @@ pub async fn invoke(
         )),
     }?;
     println!("Body: {body_str}");
+    let handler_type = HandlerType::from_str(&route_key)?;
 
-    // Send response
-    let region_name = env::var("AWS_REGION")?;
-    let gateway_url = env::var("API_GATEWAY_URL")?;
-    println!("gateway_url: {gateway_url}");
-    let region_provider =
-        RegionProviderChain::first_try(Region::new(region_name)).or_default_provider();
-    let config = aws_config::from_env()
-        .region(region_provider)
-        .endpoint_url(gateway_url.replace("wss", "https"))
-        .load()
-        .await;
-    let client = Client::new(&config);
-
-    let message = format!("Responding to {body_str}");
-
-    let _response = client
-        .post_to_connection()
-        .connection_id(connection_id.clone())
-        .data(Blob::new(message.as_bytes().to_vec()))
-        .send()
-        .await?;
+    let result = route(&handler_type, &body_str, &connection_id).await;
 
     Ok(Response::new(Body::Empty))
+}
+
+async fn route(
+    handler_type: &HandlerType,
+    body: &str,
+    connection_id: &str,
+) -> Result<String, LogicError> {
+    match handler_type {
+        HandlerType::Connect => {
+            let request: SayHelloRequest = serde_json::from_str(body)
+                .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
+            let command = request.to_command();
+            service::hello::handler(&command).await
+        }
+        HandlerType::Disconnect => {
+            let request: SayGoodbyeRequest = serde_json::from_str(body)
+                .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
+            let command = request.to_command();
+            service::goodbye::handler(&command).await
+        }
+        HandlerType::Default => handler(body, connection_id).await,
+    }
+}
+
+pub async fn handler(body_str: &str, connection_id: &str) -> Result<String, LogicError> {
+    let notifier = get_notifier().await;
+    let message = format!("Responding to {body_str}");
+    notifier.notify(&connection_id, &message).await?;
+    Ok(message.to_string())
 }
