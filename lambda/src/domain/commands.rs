@@ -9,3 +9,19 @@ pub struct SayHelloCommand {
 pub struct SayGoodbyeCommand {
     pub name: String,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateConnectionCommand {
+    pub connection_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DestroyConnectionCommand {
+    pub connection_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SetSessionCommand {
+    pub connection_id: String,
+    pub session_id: String,
+}

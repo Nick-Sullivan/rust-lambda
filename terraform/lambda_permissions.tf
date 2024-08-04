@@ -21,7 +21,11 @@ data "aws_iam_policy_document" "access_dynamodb" {
       "dynamodb:Scan",
       "dynamodb:UpdateItem",
     ]
-    effect    = "Allow"
-    resources = [aws_dynamodb_table.storage.arn]
+    effect = "Allow"
+    resources = [
+      aws_dynamodb_table.database.arn,
+      aws_dynamodb_table.game.arn,
+      aws_dynamodb_table.websocket_connection.arn,
+    ]
   }
 }

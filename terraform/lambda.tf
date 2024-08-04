@@ -16,10 +16,11 @@ resource "aws_lambda_function" "monolith" {
   ]
   environment {
     variables = {
-      HANDLER_TYPE    = "hello",
-      TABLE_NAME      = aws_dynamodb_table.storage.name,
-      REGION_NAME     = local.region,
-      API_GATEWAY_URL = aws_apigatewayv2_stage.websocket.invoke_url,
+      DATABASE             = aws_dynamodb_table.database.name,
+      WEBSOCKET_TABLE_NAME = aws_dynamodb_table.websocket_connection.name,
+      GAME_TABLE_NAME      = aws_dynamodb_table.game.name,
+      REGION_NAME          = local.region,
+      API_GATEWAY_URL      = aws_apigatewayv2_stage.websocket.invoke_url,
     }
   }
 }

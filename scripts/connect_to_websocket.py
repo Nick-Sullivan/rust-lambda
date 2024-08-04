@@ -1,5 +1,6 @@
 import asyncio
 import websockets
+import json
 
 
 def main():
@@ -7,9 +8,18 @@ def main():
 
 
 async def connect():
-    uri = "wss://8i3o8zs7oc.execute-api.eu-west-2.amazonaws.com/production"
+    uri = "wss://6wgg3w1q3k.execute-api.eu-west-2.amazonaws.com/production"
     async with websockets.connect(uri) as websocket:
-        await websocket.send("Hello, WebSocket!")
+        await websocket.send(
+            json.dumps(
+                {
+                    "action": "setSession",
+                    "data": {
+                        "sessionId": "sessionId",
+                    },
+                }
+            )
+        )
         while True:
             try:
                 response = await websocket.recv()

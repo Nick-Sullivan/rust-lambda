@@ -1,4 +1,3 @@
-use crate::api::requests::{SayGoodbyeRequest, SayHelloRequest};
 use crate::dependency_injection::get_notifier;
 use crate::notifier::notifier::INotifier;
 use crate::{domain::errors::LogicError, service};
@@ -6,21 +5,12 @@ use lambda_http::{
     aws_lambda_events::apigw::ApiGatewayWebsocketProxyRequestContext, Body, Error, Response,
 };
 
-enum HandlerType {
-    Connect,
-    Disconnect,
-    Default,
-}
+use super::requests;
 
-impl HandlerType {
-    fn from_str(s: &str) -> Result<HandlerType, String> {
-        match s {
-            "$connect" => Ok(HandlerType::Connect),
-            "$disconnect" => Ok(HandlerType::Disconnect),
-            "$default" => Ok(HandlerType::Default),
-            _ => Err("Invalid handler type".to_owned()),
-        }
-    }
+enum RequestType {
+    Connect(requests::CreateConnectionRequest),
+    Disconnect(requests::DestroyConnectionRequest),
+    SetSession(requests::SetSessionRequest),
 }
 
 pub async fn invoke(
@@ -39,45 +29,82 @@ pub async fn invoke(
     println!("connection_id: {connection_id}");
 
     let body_str = match body {
-        Body::Empty => Ok("".to_string()),
-        Body::Text(s) => Ok(s.to_string()),
         Body::Binary(_) => Err(LogicError::WebsocketError(
             "Binary not supported".to_string(),
         )),
+        Body::Empty => Ok("".to_string()),
+        Body::Text(s) => Ok(s.to_string()),
     }?;
+
     println!("Body: {body_str}");
-    let handler_type = HandlerType::from_str(&route_key)?;
 
-    let result = route(&handler_type, &body_str, &connection_id).await;
+    let request_type = get_request_type(&route_key, &body_str)?;
 
-    Ok(Response::new(Body::Empty))
-}
-
-async fn route(
-    handler_type: &HandlerType,
-    body: &str,
-    connection_id: &str,
-) -> Result<String, LogicError> {
-    match handler_type {
-        HandlerType::Connect => {
-            let request: SayHelloRequest = serde_json::from_str(body)
-                .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
-            let command = request.to_command();
-            service::hello::handler(&command).await
+    let result = route(&request_type, &connection_id).await;
+    match result {
+        Ok(message) => Ok(Response::new(Body::Text(message))),
+        Err(e) => {
+            let message = format!("Error: {e}");
+            Err(Box::new(LogicError::WebsocketError(message)))
         }
-        HandlerType::Disconnect => {
-            let request: SayGoodbyeRequest = serde_json::from_str(body)
-                .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
-            let command = request.to_command();
-            service::goodbye::handler(&command).await
-        }
-        HandlerType::Default => handler(body, connection_id).await,
     }
 }
 
-pub async fn handler(body_str: &str, connection_id: &str) -> Result<String, LogicError> {
-    let notifier = get_notifier().await;
-    let message = format!("Responding to {body_str}");
-    notifier.notify(&connection_id, &message).await?;
-    Ok(message.to_string())
+fn get_request_type(route_key: &str, body_str: &str) -> Result<RequestType, LogicError> {
+    if route_key == "$connect" {
+        return Ok(RequestType::Connect(requests::CreateConnectionRequest {}));
+    }
+    if route_key == "$disconnect" {
+        return Ok(RequestType::Disconnect(
+            requests::DestroyConnectionRequest {},
+        ));
+    }
+
+    let request: requests::WebsocketRequest = serde_json::from_str(&body_str)
+        .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
+    println!("Request action {}", request.action);
+    println!("Request data {}", request.data);
+    match request.action.as_str() {
+        "setSession" => {
+            let request: requests::SetSessionRequest = serde_json::from_value(request.data)
+                .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
+            Ok(RequestType::SetSession(request))
+        }
+        _ => Err(LogicError::WebsocketError("Unknown action".to_string()))?,
+    }
 }
+async fn route(request_type: &RequestType, connection_id: &str) -> Result<String, LogicError> {
+    match request_type {
+        RequestType::Connect(request) => {
+            let command = request.to_command(connection_id);
+            service::create_connection::handler(&command).await
+        }
+        RequestType::Disconnect(request) => {
+            let command = request.to_command(connection_id);
+            service::destroy_connection::handler(&command).await
+        }
+        RequestType::SetSession(request) => {
+            let command = request.to_command(connection_id);
+            service::set_session::handler(&command).await
+        } // HandlerType::Connect => {
+          //     let request: SayHelloRequest = serde_json::from_str(body)
+          //         .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
+          //     let command = request.to_command();
+          //     service::hello::handler(&command).await
+          // }
+          // HandlerType::Disconnect => {
+          //     let request: SayGoodbyeRequest = serde_json::from_str(body)
+          //         .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
+          //     let command = request.to_command();
+          //     service::goodbye::handler(&command).await
+          // }
+          // RequestType::Default => handler(body, connection_id).await,
+    }
+}
+
+// pub async fn handler(body_str: &str, connection_id: &str) -> Result<String, LogicError> {
+//     let notifier = get_notifier().await;
+//     let message = format!("Responding to {body_str}");
+//     notifier.notify(&connection_id, &message).await?;
+//     Ok(message.to_string())
+// }
