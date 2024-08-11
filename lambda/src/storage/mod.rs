@@ -1,9 +1,9 @@
+pub mod attribute_value_parser;
 pub mod database;
 pub mod database_cloud;
 pub mod database_local;
+pub mod dynamodb_client;
+pub mod dynamodb_client_cloud;
+pub mod dynamodb_client_local;
 pub mod session_table;
-pub mod session_table_cloud;
-pub mod session_table_local;
 pub mod websocket_table;
-pub mod websocket_table_cloud;
-pub mod websocket_table_local;

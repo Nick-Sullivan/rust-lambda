@@ -1,5 +1,3 @@
-use crate::dependency_injection::get_notifier;
-use crate::notifier::notifier::INotifier;
 use crate::{domain::errors::LogicError, service};
 use lambda_http::{
     aws_lambda_events::apigw::ApiGatewayWebsocketProxyRequestContext, Body, Error, Response,
@@ -9,6 +7,7 @@ use super::requests;
 
 enum RequestType {
     Connect(requests::CreateConnectionRequest),
+    CreateSession(requests::CreateSessionRequest),
     Disconnect(requests::DestroyConnectionRequest),
     SetSession(requests::SetSessionRequest),
 }
@@ -65,6 +64,11 @@ fn get_request_type(route_key: &str, body_str: &str) -> Result<RequestType, Logi
     println!("Request action {}", request.action);
     println!("Request data {}", request.data);
     match request.action.as_str() {
+        "getSession" => {
+            let request: requests::CreateSessionRequest = serde_json::from_value(request.data)
+                .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
+            Ok(RequestType::CreateSession(request))
+        }
         "setSession" => {
             let request: requests::SetSessionRequest = serde_json::from_value(request.data)
                 .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
@@ -78,6 +82,10 @@ async fn route(request_type: &RequestType, connection_id: &str) -> Result<String
         RequestType::Connect(request) => {
             let command = request.to_command(connection_id);
             service::create_connection::handler(&command).await
+        }
+        RequestType::CreateSession(request) => {
+            let command = request.to_command(connection_id);
+            service::create_session::handler(&command).await
         }
         RequestType::Disconnect(request) => {
             let command = request.to_command(connection_id);

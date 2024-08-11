@@ -1,4 +1,7 @@
+use super::attribute_value_parser::parse_attribute_value;
 use crate::domain::errors::LogicError;
+use aws_sdk_dynamodb::types::{AttributeValue, Get, Put, TransactGetItem, TransactWriteItem};
+use std::{collections::HashMap, env};
 
 #[derive(Clone)]
 pub struct SessionItem {
@@ -15,9 +18,58 @@ impl SessionItem {
             version: 0,
         }
     }
-}
-pub trait ISessionTable {
-    async fn get(&self, session_id: &str) -> Result<SessionItem, LogicError>;
-    async fn save(&mut self, item: &SessionItem) -> Result<(), LogicError>;
-    async fn clear(&mut self, session_id: &str) -> Result<(), LogicError>;
+
+    pub fn from_map(hash_map: &HashMap<String, AttributeValue>) -> Result<Self, LogicError> {
+        let connection_id = parse_attribute_value::<String>(hash_map.get("connection_id"))?;
+        let session_id = parse_attribute_value::<String>(hash_map.get("id"))?;
+        let version = parse_attribute_value::<i32>(hash_map.get("version"))?;
+        let item = SessionItem {
+            connection_id,
+            session_id,
+            version,
+        };
+        Ok(item)
+    }
+
+    fn get_table_name() -> String {
+        env::var("GAME_TABLE_NAME").unwrap_or_else(|_| "".to_string())
+    }
+
+    pub fn get(session_id: &str) -> Result<TransactGetItem, LogicError> {
+        let get_item = Get::builder()
+            .table_name(Self::get_table_name())
+            .key("id", AttributeValue::S(session_id.to_string()))
+            .build()
+            .map_err(|e| LogicError::GetItemError(e.to_string()))?;
+        let transaction_item = TransactGetItem::builder().get(get_item).build();
+        Ok(transaction_item)
+    }
+
+    pub fn save(&self) -> Result<TransactWriteItem, LogicError> {
+        let put_item = Put::builder()
+            .table_name(Self::get_table_name())
+            .item("id", AttributeValue::S(self.session_id.clone()))
+            .item(
+                "connection_id",
+                AttributeValue::S(self.connection_id.to_string()),
+            )
+            .item("version", AttributeValue::N(self.version.to_string()));
+
+        let old_version = self.version - 1;
+        let put_item = if old_version < 0 {
+            put_item.condition_expression("attribute_not_exists(id)")
+        } else {
+            put_item
+                .condition_expression("version = :old_version")
+                .expression_attribute_values(
+                    ":old_version",
+                    AttributeValue::N(old_version.to_string()),
+                )
+        };
+        let put_item = put_item
+            .build()
+            .map_err(|e| LogicError::UpdateItemError(e.to_string()))?;
+        let transaction_item = TransactWriteItem::builder().put(put_item).build();
+        Ok(transaction_item)
+    }
 }

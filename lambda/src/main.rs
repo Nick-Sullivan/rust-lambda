@@ -4,6 +4,8 @@ mod domain;
 mod notifier;
 mod service;
 mod storage;
+#[cfg(test)]
+mod test_setup;
 use lambda_http::request::RequestContext;
 use lambda_http::{run, service_fn, tracing, Error};
 use lambda_http::{Body, Request, RequestExt, Response};

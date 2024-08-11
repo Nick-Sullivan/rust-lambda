@@ -2,23 +2,20 @@
 mod injections {
     pub use crate::notifier::notifier_cloud::Notifier;
     pub use crate::storage::database_cloud::Database;
-    pub use crate::storage::session_table_cloud::SessionTable;
-    pub use crate::storage::websocket_table_cloud::WebsocketTable;
+    pub use crate::storage::dynamodb_client_cloud::DynamoDbClient;
 }
 #[cfg(test)]
 mod injections {
     pub use crate::notifier::notifier_local::Notifier;
     pub use crate::storage::database_local::Database;
-    pub use crate::storage::session_table_local::SessionTable;
-    pub use crate::storage::websocket_table_local::WebsocketTable;
+    pub use crate::storage::dynamodb_client_local::DynamoDbClient;
 }
-use injections::{Database, Notifier, SessionTable, WebsocketTable};
+use injections::{Database, DynamoDbClient, Notifier};
 use std::sync::Arc;
 use tokio::sync::{Mutex, OnceCell};
 
 static DATABASE: OnceCell<Arc<Mutex<Database>>> = OnceCell::const_new();
-static SESSION_TABLE: OnceCell<Arc<Mutex<SessionTable>>> = OnceCell::const_new();
-static WEBSOCKET_TABLE: OnceCell<Arc<Mutex<WebsocketTable>>> = OnceCell::const_new();
+static DYNAMODB_CLIENT: OnceCell<Arc<Mutex<DynamoDbClient>>> = OnceCell::const_new();
 static NOTIFIER: OnceCell<Arc<Notifier>> = OnceCell::const_new();
 
 pub async fn get_database() -> Arc<Mutex<Database>> {
@@ -29,15 +26,11 @@ pub async fn get_notifier() -> Arc<Notifier> {
     NOTIFIER.get_or_init(init_notifier).await.clone()
 }
 
-pub async fn get_websocket_table() -> Arc<Mutex<WebsocketTable>> {
-    WEBSOCKET_TABLE
-        .get_or_init(init_websocket_table)
+pub async fn get_dynamodb_client() -> Arc<Mutex<DynamoDbClient>> {
+    DYNAMODB_CLIENT
+        .get_or_init(init_dynamodb_client)
         .await
         .clone()
-}
-
-pub async fn get_session_table() -> Arc<Mutex<SessionTable>> {
-    SESSION_TABLE.get_or_init(init_session_table).await.clone()
 }
 
 async fn init_database() -> Arc<Mutex<Database>> {
@@ -50,12 +43,7 @@ async fn init_notifier() -> Arc<Notifier> {
     Arc::new(notifier)
 }
 
-async fn init_session_table() -> Arc<Mutex<SessionTable>> {
-    let table = SessionTable::new().await;
-    Arc::new(Mutex::new(table))
-}
-
-async fn init_websocket_table() -> Arc<Mutex<WebsocketTable>> {
-    let table = WebsocketTable::new().await;
-    Arc::new(Mutex::new(table))
+async fn init_dynamodb_client() -> Arc<Mutex<DynamoDbClient>> {
+    let client = DynamoDbClient::new().await;
+    Arc::new(Mutex::new(client))
 }

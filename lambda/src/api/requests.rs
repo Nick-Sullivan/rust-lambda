@@ -37,6 +37,16 @@ impl CreateConnectionRequest {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct CreateSessionRequest {}
+impl CreateSessionRequest {
+    pub fn to_command(&self, connection_id: &str) -> commands::CreateSessionCommand {
+        commands::CreateSessionCommand {
+            connection_id: connection_id.to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DestroyConnectionRequest {}
 impl DestroyConnectionRequest {
     pub fn to_command(&self, connection_id: &str) -> commands::DestroyConnectionCommand {

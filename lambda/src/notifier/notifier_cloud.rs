@@ -1,3 +1,4 @@
+use super::notifier::Message;
 use crate::domain::errors::LogicError;
 use crate::notifier::notifier::INotifier;
 use aws_config::meta::region::RegionProviderChain;
@@ -26,11 +27,13 @@ impl Notifier {
 }
 
 impl INotifier for Notifier {
-    async fn notify(&self, connection_id: &str, message: &str) -> Result<(), LogicError> {
+    async fn notify(&self, connection_id: &str, message: &Message) -> Result<(), LogicError> {
+        let data = serde_json::to_string(message)
+            .map_err(|e| LogicError::SerializationError(e.to_string()))?;
         self.client
             .post_to_connection()
             .connection_id(connection_id)
-            .data(Blob::new(message.as_bytes().to_vec()))
+            .data(Blob::new(data.as_bytes().to_vec()))
             .send()
             .await
             .map_err(|e| LogicError::WebsocketError(e.to_string()))?;

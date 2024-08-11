@@ -16,6 +16,11 @@ pub struct CreateConnectionCommand {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct CreateSessionCommand {
+    pub connection_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DestroyConnectionCommand {
     pub connection_id: String,
 }
