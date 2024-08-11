@@ -9,26 +9,17 @@ use uuid::Uuid;
 
 pub async fn handler(command: &CreateSessionCommand) -> Result<String, LogicError> {
     let db = get_dynamodb_client().await;
-    let db_lock = db.lock().await;
+    let notifier = get_notifier().await;
 
-    let transaction = WebsocketItem::get(&command.connection_id)?;
-    let output = db_lock.read(transaction).await?;
-    let attribute = output
-        .item
-        .ok_or(LogicError::GetItemError("Item not found".to_string()))?;
-    let mut connection = WebsocketItem::from_map(&attribute)?;
-
+    let mut connection = WebsocketItem::from_db(&command.connection_id, &db).await?;
     let session_id = match connection.session_id {
         Some(session_id) => session_id,
         None => {
             let session_id = Uuid::new_v4().to_string();
-            let item = SessionItem::new(&session_id, &command.connection_id);
-            let transaction = item.save()?;
+            let session = SessionItem::new(&session_id, &command.connection_id);
             connection.session_id = Some(session_id.clone());
             connection.version += 1;
-            let connection_transaction = connection.save()?;
-            let transactions = vec![transaction, connection_transaction];
-            db_lock.write(transactions).await?;
+            db.write(vec![session.save()?, connection.save()?]).await?;
             session_id
         }
     };
@@ -37,7 +28,6 @@ pub async fn handler(command: &CreateSessionCommand) -> Result<String, LogicErro
         action: ActionType::GetSession,
         data: session_id.clone(),
     };
-    let notifier = get_notifier().await;
     notifier.notify(&connection.connection_id, &message).await?;
     Ok(session_id)
 }
@@ -59,13 +49,11 @@ mod tests {
     #[tokio::test]
     async fn creates_new_session() -> Result<(), LogicError> {
         test_setup::setup();
-        let connection_id = Uuid::new_v4().to_string();
-        let item = WebsocketItem::new(&connection_id);
-        let transaction = item.save()?;
         let db = get_dynamodb_client().await;
-        let db_lock = db.lock().await;
-        let _ = db_lock.write(vec![transaction]).await;
-        drop(db_lock);
+
+        let connection_id = Uuid::new_v4().to_string();
+        let connection = WebsocketItem::new(&connection_id);
+        db.write_single(connection.save()?).await?;
 
         let request = CreateSessionCommand {
             connection_id: connection_id.clone(),
@@ -81,51 +69,38 @@ mod tests {
         assert_eq!(messages.len(), 1);
 
         // Updates database tables
-        let db_lock = db.lock().await;
-        let connection = WebsocketItem::get(&connection_id)?;
-        let connection = db_lock
-            .read(connection)
-            .await?
-            .item
-            .ok_or(LogicError::GetItemError("Item not found".to_string()))?;
-        let connection = WebsocketItem::from_map(&connection)?;
-        assert!(connection.session_id.is_some());
-
-        let transaction = SessionItem::get(&connection.session_id.unwrap())?;
-        let output = db_lock.read(transaction).await?;
-        let attribute = output
-            .item
-            .ok_or(LogicError::GetItemError("Item not found".to_string()))?;
-        let session = SessionItem::from_map(&attribute)?;
+        let connection = WebsocketItem::from_db(&connection_id, &db).await?;
+        let session_id = match connection.session_id {
+            Some(session_id) => session_id,
+            None => return Err(LogicError::GetItemError("Session not found".to_string())),
+        };
+        let session = SessionItem::from_db(&session_id, &db).await?;
         assert_eq!(session.connection_id, connection_id);
         Ok(())
     }
 
     #[tokio::test]
-    async fn reuses_session_if_it_already_exists() {
+    async fn reuses_session_if_it_already_exists() -> Result<(), LogicError> {
         test_setup::setup();
+        let db = get_dynamodb_client().await;
+
         let connection_id = Uuid::new_v4().to_string();
         let session_id = Uuid::new_v4().to_string();
         let connection = WebsocketItem {
             connection_id: connection_id.to_string(),
             session_id: Some(session_id.to_string()),
             version: 0,
-        }
-        .save()
-        .unwrap();
-        let session = SessionItem::new(&session_id, &connection_id)
-            .save()
-            .unwrap();
-        let db = get_dynamodb_client().await;
-        let db_lock = db.lock().await;
-        let _ = db_lock.write(vec![connection, session]).await;
-        drop(db_lock);
+        };
+        let session = SessionItem::new(&session_id, &connection_id);
+        db.write(vec![connection.save()?, session.save()?]).await?;
 
         let request = CreateSessionCommand { connection_id };
         let result = handler(&request).await;
-        assert!(result.is_ok(), "Error: {:?}", result.err());
-        assert_eq!(result.unwrap(), session_id);
-        // TODO check it sends notifications
-        // TODO check it created the item in two tables
+        let response = match result {
+            Ok(response) => response,
+            Err(error) => return Err(error),
+        };
+        assert_eq!(response, session_id);
+        Ok(())
     }
 }

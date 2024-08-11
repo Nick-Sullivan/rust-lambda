@@ -6,18 +6,8 @@ use crate::storage::websocket_table::WebsocketItem;
 
 pub async fn handler(command: &DestroyConnectionCommand) -> Result<String, LogicError> {
     let db = get_dynamodb_client().await;
-
-    let transaction = WebsocketItem::get(&command.connection_id)?;
-    let db_lock = db.lock().await;
-    let response = db_lock.read(transaction).await?;
-    let attribute = response
-        .item
-        .ok_or(LogicError::GetItemError("Item not found".to_string()))?;
-    let item = WebsocketItem::from_map(&attribute)?;
-    let transaction = item
-        .delete()
-        .map_err(|e| LogicError::DeleteItemError(e.to_string()))?;
-    db_lock.write(vec![transaction]).await?;
+    let connection = WebsocketItem::from_db(&command.connection_id, &db).await?;
+    db.write(vec![connection.delete()?]).await?;
     Ok("Success".to_string())
 }
 
@@ -37,19 +27,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn destroys_connection() {
+    async fn destroys_connection() -> Result<(), LogicError> {
         test_setup::setup();
-        let connection_id = Uuid::new_v4().to_string();
-        let item = WebsocketItem::new(&connection_id);
-        let transaction = item.save().unwrap();
-
         let db = get_dynamodb_client().await;
-        let db_lock = db.lock().await;
-        let _ = db_lock.write(vec![transaction]).await;
-        drop(db_lock);
+
+        let connection_id = Uuid::new_v4().to_string();
+        let connection = WebsocketItem::new(&connection_id);
+        db.write_single(connection.save()?).await?;
 
         let request = DestroyConnectionCommand { connection_id };
         let result = handler(&request).await;
         assert!(result.is_ok(), "Error: {:?}", result.err());
+        Ok(())
     }
 }

@@ -1,6 +1,6 @@
-use super::attribute_value_parser::parse_attribute_value;
 use crate::domain::errors::LogicError;
 use crate::domain::utils::single;
+use crate::storage::attribute_value_parser::parse_attribute_value;
 use crate::storage::dynamodb_client::IDynamoDbClient;
 use aws_sdk_dynamodb::operation::transact_get_items::builders::TransactGetItemsOutputBuilder;
 use aws_sdk_dynamodb::types::{
@@ -147,7 +147,7 @@ impl DynamoDbClient {
 }
 
 impl IDynamoDbClient for DynamoDbClient {
-    async fn read(&self, item: TransactGetItem) -> Result<ItemResponse, LogicError> {
+    async fn read_single(&self, item: TransactGetItem) -> Result<ItemResponse, LogicError> {
         let get = item.get.ok_or(LogicError::GetItemError(
             "Only Gets are supported".to_string(),
         ))?;
@@ -174,15 +174,20 @@ impl IDynamoDbClient for DynamoDbClient {
 
     async fn write(&self, items: Vec<TransactWriteItem>) -> Result<(), LogicError> {
         for item in items {
-            if let Some(put) = item.put {
-                self.write_put(put)?;
-            } else if let Some(delete) = item.delete {
-                self.write_delete(delete)?;
-            } else {
-                return Err(LogicError::UpdateItemError(
-                    "Only Put/Delete is supported".to_string(),
-                ));
-            }
+            self.write_single(item).await?;
+        }
+        Ok(())
+    }
+
+    async fn write_single(&self, item: TransactWriteItem) -> Result<(), LogicError> {
+        if let Some(put) = item.put {
+            self.write_put(put)?;
+        } else if let Some(delete) = item.delete {
+            self.write_delete(delete)?;
+        } else {
+            return Err(LogicError::UpdateItemError(
+                "Only Put/Delete is supported".to_string(),
+            ));
         }
         Ok(())
     }

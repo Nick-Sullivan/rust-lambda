@@ -6,16 +6,8 @@ use crate::storage::session_table::SessionItem;
 
 pub async fn handler(command: &SetSessionCommand) -> Result<String, LogicError> {
     let db = get_dynamodb_client().await;
-
-    println!("initialising item");
     let item = SessionItem::new(&command.session_id, &command.connection_id);
-    println!("creating transaction");
-    let transaction = item.save()?;
-    let transactions = vec![transaction];
-    println!("saving to db");
-    let db_lock = db.lock().await;
-    db_lock.write(transactions).await?;
-    println!("returning");
+    db.write_single(item.save()?).await?;
     Ok("Success".to_string())
 }
 

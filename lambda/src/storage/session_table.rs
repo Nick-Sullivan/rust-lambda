@@ -1,5 +1,6 @@
-use super::attribute_value_parser::parse_attribute_value;
 use crate::domain::errors::LogicError;
+use crate::storage::attribute_value_parser::parse_attribute_value;
+use crate::storage::dynamodb_client::{DynamoDbClient, IDynamoDbClient};
 use aws_sdk_dynamodb::types::{AttributeValue, Get, Put, TransactGetItem, TransactWriteItem};
 use std::{collections::HashMap, env};
 
@@ -17,6 +18,16 @@ impl SessionItem {
             connection_id: connection_id.to_string(),
             version: 0,
         }
+    }
+
+    pub async fn from_db(connection_id: &str, db: &DynamoDbClient) -> Result<Self, LogicError> {
+        let transaction = Self::get(connection_id)?;
+        let output = db.read_single(transaction).await?;
+        let attribute = output
+            .item
+            .ok_or(LogicError::GetItemError("Item not found".to_string()))?;
+        let item = Self::from_map(&attribute)?;
+        Ok(item)
     }
 
     pub fn from_map(hash_map: &HashMap<String, AttributeValue>) -> Result<Self, LogicError> {

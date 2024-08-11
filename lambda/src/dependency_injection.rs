@@ -1,21 +1,11 @@
-#[cfg(not(test))]
-mod injections {
-    pub use crate::notifier::notifier_cloud::Notifier;
-    pub use crate::storage::database_cloud::Database;
-    pub use crate::storage::dynamodb_client_cloud::DynamoDbClient;
-}
-#[cfg(test)]
-mod injections {
-    pub use crate::notifier::notifier_local::Notifier;
-    pub use crate::storage::database_local::Database;
-    pub use crate::storage::dynamodb_client_local::DynamoDbClient;
-}
-use injections::{Database, DynamoDbClient, Notifier};
+pub use crate::notifier::notifier::Notifier;
+pub use crate::storage::database::Database;
+pub use crate::storage::dynamodb_client::DynamoDbClient;
 use std::sync::Arc;
 use tokio::sync::{Mutex, OnceCell};
 
 static DATABASE: OnceCell<Arc<Mutex<Database>>> = OnceCell::const_new();
-static DYNAMODB_CLIENT: OnceCell<Arc<Mutex<DynamoDbClient>>> = OnceCell::const_new();
+static DYNAMODB_CLIENT: OnceCell<Arc<DynamoDbClient>> = OnceCell::const_new();
 static NOTIFIER: OnceCell<Arc<Notifier>> = OnceCell::const_new();
 
 pub async fn get_database() -> Arc<Mutex<Database>> {
@@ -26,7 +16,7 @@ pub async fn get_notifier() -> Arc<Notifier> {
     NOTIFIER.get_or_init(init_notifier).await.clone()
 }
 
-pub async fn get_dynamodb_client() -> Arc<Mutex<DynamoDbClient>> {
+pub async fn get_dynamodb_client() -> Arc<DynamoDbClient> {
     DYNAMODB_CLIENT
         .get_or_init(init_dynamodb_client)
         .await
@@ -43,7 +33,7 @@ async fn init_notifier() -> Arc<Notifier> {
     Arc::new(notifier)
 }
 
-async fn init_dynamodb_client() -> Arc<Mutex<DynamoDbClient>> {
+async fn init_dynamodb_client() -> Arc<DynamoDbClient> {
     let client = DynamoDbClient::new().await;
-    Arc::new(Mutex::new(client))
+    Arc::new(client)
 }

@@ -1,6 +1,6 @@
-use super::dynamodb_client::IDynamoDbClient;
 use crate::domain::errors::LogicError;
 use crate::domain::utils::single;
+use crate::storage::dynamodb_client::IDynamoDbClient;
 use aws_config;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::types::{ItemResponse, TransactGetItem, TransactWriteItem};
@@ -24,7 +24,7 @@ impl DynamoDbClient {
 }
 
 impl IDynamoDbClient for DynamoDbClient {
-    async fn read(&self, item: TransactGetItem) -> Result<ItemResponse, LogicError> {
+    async fn read_single(&self, item: TransactGetItem) -> Result<ItemResponse, LogicError> {
         let result = self
             .client
             .transact_get_items()
@@ -50,5 +50,9 @@ impl IDynamoDbClient for DynamoDbClient {
             Ok(_) => Ok(()),
             Err(e) => Err(LogicError::UpdateItemError(e.to_string())),
         }
+    }
+
+    async fn write_single(&self, item: TransactWriteItem) -> Result<(), LogicError> {
+        self.write(vec![item]).await
     }
 }
