@@ -8,6 +8,7 @@ use std::{collections::HashMap, env};
 pub struct SessionItem {
     pub session_id: String,
     pub connection_id: String,
+    pub nickname: Option<String>,
     pub version: i32,
 }
 
@@ -16,12 +17,13 @@ impl SessionItem {
         SessionItem {
             session_id: session_id.to_string(),
             connection_id: connection_id.to_string(),
+            nickname: None,
             version: 0,
         }
     }
 
-    pub async fn from_db(connection_id: &str, db: &DynamoDbClient) -> Result<Self, LogicError> {
-        let transaction = Self::get(connection_id)?;
+    pub async fn from_db(session_id: &str, db: &DynamoDbClient) -> Result<Self, LogicError> {
+        let transaction = Self::get(session_id)?;
         let output = db.read_single(transaction).await?;
         let attribute = output
             .item
@@ -34,9 +36,11 @@ impl SessionItem {
         let connection_id = parse_attribute_value::<String>(hash_map.get("connection_id"))?;
         let session_id = parse_attribute_value::<String>(hash_map.get("id"))?;
         let version = parse_attribute_value::<i32>(hash_map.get("version"))?;
+        let nickname = parse_attribute_value::<Option<String>>(hash_map.get("nickname"))?;
         let item = SessionItem {
             connection_id,
             session_id,
+            nickname,
             version,
         };
         Ok(item)
@@ -65,6 +69,13 @@ impl SessionItem {
                 AttributeValue::S(self.connection_id.to_string()),
             )
             .item("version", AttributeValue::N(self.version.to_string()));
+
+        let put_item = match self.nickname {
+            Some(ref nickname) => {
+                put_item.item("nickname", AttributeValue::S(nickname.to_string()))
+            }
+            None => put_item,
+        };
 
         let old_version = self.version - 1;
         let put_item = if old_version < 0 {

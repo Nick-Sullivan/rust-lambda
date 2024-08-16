@@ -1,20 +1,24 @@
-use crate::dependency_injection::{get_dynamodb_client, get_notifier};
+use crate::dependency_injection;
 use crate::domain::commands::CreateSessionCommand;
 use crate::domain::errors::LogicError;
 use crate::notifier::notifier::{ActionType, INotifier, Message};
 use crate::storage::dynamodb_client::IDynamoDbClient;
 use crate::storage::session_table::SessionItem;
 use crate::storage::websocket_table::WebsocketItem;
+use serde_json::json;
 use uuid::Uuid;
 
 pub async fn handler(command: &CreateSessionCommand) -> Result<String, LogicError> {
-    let db = get_dynamodb_client().await;
-    let notifier = get_notifier().await;
+    let db = dependency_injection::get_dynamodb_client().await;
+    let notifier = dependency_injection::get_notifier().await;
 
+    println!("Loading connection");
     let mut connection = WebsocketItem::from_db(&command.connection_id, &db).await?;
+    println!("Checking session");
     let session_id = match connection.session_id {
         Some(session_id) => session_id,
         None => {
+            println!("Creating new session");
             let session_id = Uuid::new_v4().to_string();
             let session = SessionItem::new(&session_id, &command.connection_id);
             connection.session_id = Some(session_id.clone());
@@ -24,9 +28,11 @@ pub async fn handler(command: &CreateSessionCommand) -> Result<String, LogicErro
         }
     };
 
+    println!("Sending notification");
     let message = Message {
         action: ActionType::GetSession,
-        data: session_id.clone(),
+        data: Some(json!(session_id.clone())),
+        error: None,
     };
     notifier.notify(&connection.connection_id, &message).await?;
     Ok(session_id)
@@ -49,7 +55,7 @@ mod tests {
     #[tokio::test]
     async fn creates_new_session() -> Result<(), LogicError> {
         test_setup::setup();
-        let db = get_dynamodb_client().await;
+        let db = dependency_injection::get_dynamodb_client().await;
 
         let connection_id = Uuid::new_v4().to_string();
         let connection = WebsocketItem::new(&connection_id);
@@ -82,7 +88,7 @@ mod tests {
     #[tokio::test]
     async fn reuses_session_if_it_already_exists() -> Result<(), LogicError> {
         test_setup::setup();
-        let db = get_dynamodb_client().await;
+        let db = dependency_injection::get_dynamodb_client().await;
 
         let connection_id = Uuid::new_v4().to_string();
         let session_id = Uuid::new_v4().to_string();

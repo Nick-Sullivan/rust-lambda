@@ -26,6 +26,13 @@ pub struct DestroyConnectionCommand {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct SetNicknameCommand {
+    pub connection_id: String,
+    pub session_id: String,
+    pub nickname: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SetSessionCommand {
     pub connection_id: String,
     pub session_id: String,

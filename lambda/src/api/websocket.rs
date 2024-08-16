@@ -9,6 +9,7 @@ enum RequestType {
     Connect(requests::CreateConnectionRequest),
     CreateSession(requests::CreateSessionRequest),
     Disconnect(requests::DestroyConnectionRequest),
+    SetNickname(requests::SetNicknameRequest),
     SetSession(requests::SetSessionRequest),
 }
 
@@ -69,6 +70,11 @@ fn get_request_type(route_key: &str, body_str: &str) -> Result<RequestType, Logi
                 .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
             Ok(RequestType::CreateSession(request))
         }
+        "setNickname" => {
+            let request: requests::SetNicknameRequest = serde_json::from_value(request.data)
+                .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
+            Ok(RequestType::SetNickname(request))
+        }
         "setSession" => {
             let request: requests::SetSessionRequest = serde_json::from_value(request.data)
                 .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
@@ -77,6 +83,7 @@ fn get_request_type(route_key: &str, body_str: &str) -> Result<RequestType, Logi
         _ => Err(LogicError::WebsocketError("Unknown action".to_string()))?,
     }
 }
+
 async fn route(request_type: &RequestType, connection_id: &str) -> Result<String, LogicError> {
     match request_type {
         RequestType::Connect(request) => {
@@ -90,6 +97,10 @@ async fn route(request_type: &RequestType, connection_id: &str) -> Result<String
         RequestType::Disconnect(request) => {
             let command = request.to_command(connection_id);
             service::destroy_connection::handler(&command).await
+        }
+        RequestType::SetNickname(request) => {
+            let command = request.to_command(connection_id);
+            service::set_nickname::handler(&command).await
         }
         RequestType::SetSession(request) => {
             let command = request.to_command(connection_id);

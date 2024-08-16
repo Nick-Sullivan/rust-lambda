@@ -8,14 +8,25 @@ def main():
 
 
 async def connect():
-    uri = "wss://6wgg3w1q3k.execute-api.eu-west-2.amazonaws.com/production"
+    uri = "wss://k6lgst3usl.execute-api.eu-west-2.amazonaws.com/production"
     async with websockets.connect(uri) as websocket:
+        await websocket.send(json.dumps({"action": "getSession", "data": {}}))
+        response = await websocket.recv()
+        print(response)
+        response_json = json.loads(response)
+        session_id = response_json["data"]
+
+    async with websockets.connect(uri) as websocket:
+        await websocket.send(
+            json.dumps({"action": "setSession", "data": {"sessionId": session_id}})
+        )
         await websocket.send(
             json.dumps(
                 {
-                    "action": "setSession",
+                    "action": "setNickname",
                     "data": {
-                        "sessionId": "sessionId",
+                        "sessionId": session_id,
+                        "nickname": "nick",
                     },
                 }
             )
