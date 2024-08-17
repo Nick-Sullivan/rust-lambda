@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+    "api",
+    "api_cloud_entry",
+    "api_local_entry",
+    "domain",
+    "notifier",
+    "service",
+    "storage",
+]

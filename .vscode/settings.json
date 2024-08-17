@@ -1,9 +1,10 @@
 {
     "editor.inlayHints.enabled": "off",
     "rust-analyzer.linkedProjects": [
-        "./lambda/lambda_lib/Cargo.toml",
-        "./lambda/lambda_entry/Cargo.toml",
-        "./lambda/local_entry/Cargo.toml",
+        "./lambda/Cargo.toml",
+    ],
+    "rust-analyzer.cargo.features": [
+        "in_memory"
     ],
     "tasks.autoDetect": "off",
     "tasks.runOnFolderOpen": true,
