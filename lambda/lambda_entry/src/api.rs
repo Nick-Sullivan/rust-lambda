@@ -1,23 +1,7 @@
-use crate::api::requests::{SayGoodbyeRequest, SayHelloRequest};
-use crate::domain::errors::LogicError;
-use crate::service;
 use lambda_http::aws_lambda_events::apigw::ApiGatewayProxyRequestContext;
 use lambda_http::{Body, Error, Response};
-
-enum HandlerType {
-    Goodbye,
-    Hello,
-}
-
-impl HandlerType {
-    fn from_str(s: &str) -> Result<HandlerType, String> {
-        match s {
-            "/v1/hello" => Ok(HandlerType::Hello),
-            "/v1/goodbye" => Ok(HandlerType::Goodbye),
-            _ => Err("Invalid handler type".to_owned()),
-        }
-    }
-}
+use lambda_lib::api::api;
+use lambda_lib::domain::errors::LogicError;
 
 pub async fn invoke(
     body: &Body,
@@ -37,7 +21,7 @@ pub async fn invoke(
     println!("Email: {email}");
     println!("Username: {username}");
 
-    let handler_type = HandlerType::from_str(&path)?;
+    let handler_type = api::HandlerType::from_str(&path)?;
     let body_str = match body {
         Body::Empty => Ok("".to_string()),
         Body::Text(s) => Ok(s.to_string()),
@@ -48,7 +32,7 @@ pub async fn invoke(
     let max_retries = 10;
 
     for _ in 0..max_retries {
-        let result = route(&handler_type, body_str.as_bytes()).await;
+        let result = api::route(&handler_type, body_str.as_bytes()).await;
         if let Err(LogicError::ConditionalCheckFailed(_)) = result {
             continue;
         }
@@ -58,28 +42,6 @@ pub async fn invoke(
     build_response(Err(LogicError::ConditionalCheckFailed(
         "Max retries reached".into(),
     )))
-}
-
-async fn route(handler_type: &HandlerType, body: &[u8]) -> Result<String, LogicError> {
-    match handler_type {
-        HandlerType::Hello => {
-            let request = deserialise_body::<SayHelloRequest>(body)?;
-            let command = request.to_command();
-            service::hello::handler(&command).await
-        }
-        HandlerType::Goodbye => {
-            let request = deserialise_body::<SayGoodbyeRequest>(body)?;
-            let command = request.to_command();
-            service::goodbye::handler(&command).await
-        }
-    }
-}
-
-fn deserialise_body<T>(body_str: &[u8]) -> Result<T, LogicError>
-where
-    T: serde::de::DeserializeOwned,
-{
-    serde_json::from_slice(body_str).map_err(|e| LogicError::DeserializationError(e.to_string()))
 }
 
 fn build_response(result: Result<String, LogicError>) -> Result<Response<Body>, Error> {

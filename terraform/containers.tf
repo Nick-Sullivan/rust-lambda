@@ -39,7 +39,7 @@ resource "terraform_data" "lambda_build" {
   triggers_replace = [
     timestamp(), # always trigger
     md5(file("${local.lambda_dir}/Dockerfile")),
-    filesha256("${local.lambda_dir}/target/lambda/rust_lambda/bootstrap.zip"),
+    # filesha256("${local.lambda_dir}/target/lambda/rust_lambda/bootstrap.zip"),
   ]
   provisioner "local-exec" {
     working_dir = local.lambda_dir

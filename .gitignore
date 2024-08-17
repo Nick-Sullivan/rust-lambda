@@ -1,4 +1,4 @@
-lambda/target
+**/target
 **/zip
 *.terraform
 .venv/*
