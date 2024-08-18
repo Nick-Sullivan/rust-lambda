@@ -44,27 +44,23 @@ fn is_valid_nickname(nickname: &str) -> bool {
 }
 
 fn create_success_message(session_id: &str, nickname: &str) -> Message {
-    Message {
-        action: ActionType::SetNickname,
-        data: Some(json!({"nickname": nickname, "playerId": session_id})),
-        error: None,
-    }
+    Message::new(
+        ActionType::SetNickname,
+        json!({"nickname": nickname, "playerId": session_id}),
+    )
 }
 
 fn create_failure_message() -> Message {
-    Message {
-        action: ActionType::SetNickname,
-        data: None,
-        error: Some(json!("Invalid nickname".to_string())),
-    }
+    Message::new_err(
+        ActionType::SetNickname,
+        json!("Invalid nickname".to_string()),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_setup;
-    use domain::commands::SetNicknameCommand;
-    use storage::session_table::SessionAction;
     use uuid::Uuid;
 
     #[tokio::test]

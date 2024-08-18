@@ -37,6 +37,20 @@ impl CreateConnectionRequest {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct CreateGameRequest {
+    #[serde(rename = "sessionId")]
+    pub session_id: String,
+}
+impl CreateGameRequest {
+    pub fn to_command(&self, connection_id: &str) -> commands::CreateGameCommand {
+        commands::CreateGameCommand {
+            connection_id: connection_id.to_string(),
+            session_id: self.session_id.clone(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CreateSessionRequest {}
 impl CreateSessionRequest {
     pub fn to_command(&self, connection_id: &str) -> commands::CreateSessionCommand {

@@ -40,23 +40,25 @@ impl SessionAction {
 
 #[derive(Clone)]
 pub struct SessionItem {
-    pub session_id: String,
     pub connection_id: String,
-    pub nickname: Option<String>,
-    pub version: i32,
+    pub game_id: Option<String>,
     pub modified_at: DateTime<Utc>,
     pub modified_action: SessionAction,
+    pub nickname: Option<String>,
+    pub session_id: String,
+    pub version: i32,
 }
 
 impl SessionItem {
     pub fn new(session_id: &str, connection_id: &str) -> Self {
         SessionItem {
-            session_id: session_id.to_string(),
             connection_id: connection_id.to_string(),
+            game_id: None,
             nickname: None,
-            version: 0,
             modified_at: Utc::now(),
             modified_action: SessionAction::CreateConnection,
+            session_id: session_id.to_string(),
+            version: 0,
         }
     }
 
@@ -72,21 +74,23 @@ impl SessionItem {
 
     pub fn from_map(hash_map: &HashMap<String, AttributeValue>) -> Result<Self, LogicError> {
         let connection_id = parse_attribute_value::<String>(hash_map.get("connection_id"))?;
-        let session_id = parse_attribute_value::<String>(hash_map.get("id"))?;
-        let version = parse_attribute_value::<i32>(hash_map.get("version"))?;
-        let nickname = parse_attribute_value::<Option<String>>(hash_map.get("nickname"))?;
+        let game_id = parse_attribute_value::<Option<String>>(hash_map.get("game_id"))?;
         let modified_at = parse_attribute_value::<DateTime<Utc>>(hash_map.get("modified_at"))?;
         let modified_action = SessionAction::from_str(&parse_attribute_value::<String>(
             hash_map.get("modified_action"),
         )?)?;
+        let nickname = parse_attribute_value::<Option<String>>(hash_map.get("nickname"))?;
+        let session_id = parse_attribute_value::<String>(hash_map.get("id"))?;
+        let version = parse_attribute_value::<i32>(hash_map.get("version"))?;
 
         let item = SessionItem {
             connection_id,
-            session_id,
-            nickname,
-            version,
+            game_id,
             modified_at,
             modified_action,
+            nickname,
+            session_id,
+            version,
         };
         Ok(item)
     }
@@ -113,15 +117,20 @@ impl SessionItem {
                 "connection_id",
                 AttributeValue::S(self.connection_id.to_string()),
             )
-            .item("version", AttributeValue::N(self.version.to_string()))
+            .item(
+                "modified_action",
+                AttributeValue::S(self.modified_action.as_str().to_string()),
+            )
             .item(
                 "modified_at",
                 AttributeValue::S(self.modified_at.format(DATETIME_FORMAT).to_string()),
             )
-            .item(
-                "modified_action",
-                AttributeValue::S(self.modified_action.as_str().to_string()),
-            );
+            .item("version", AttributeValue::N(self.version.to_string()));
+
+        let put_item = match self.game_id {
+            Some(ref game_id) => put_item.item("game_id", AttributeValue::S(game_id.to_string())),
+            None => put_item,
+        };
 
         let put_item = match self.nickname {
             Some(ref nickname) => {

@@ -1,4 +1,5 @@
 pub mod create_connection;
+pub mod create_game;
 pub mod create_session;
 pub mod destroy_connection;
 pub mod goodbye;

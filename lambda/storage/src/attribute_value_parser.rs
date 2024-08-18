@@ -56,6 +56,19 @@ impl AttributeValueParser for i32 {
     }
 }
 
+impl AttributeValueParser for bool {
+    fn parse(value: Option<&AttributeValue>) -> Result<Self, LogicError> {
+        let value = value.ok_or(LogicError::DeserializationError(
+            "Key not found".to_string(),
+        ))?;
+        let result = value
+            .as_bool()
+            .map_err(|_| LogicError::DeserializationError("Expected bool".to_string()))?
+            .clone();
+        Ok(result)
+    }
+}
+
 impl AttributeValueParser for DateTime<Utc> {
     fn parse(value: Option<&AttributeValue>) -> Result<Self, LogicError> {
         let value = value.ok_or(LogicError::DeserializationError(

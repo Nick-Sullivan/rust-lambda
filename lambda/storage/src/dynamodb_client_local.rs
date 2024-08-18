@@ -107,7 +107,7 @@ impl DynamoDbClient {
             }
             _ => {}
         }
-        return Ok(());
+        Ok(())
     }
 
     fn check_delete_condition(
@@ -142,7 +142,7 @@ impl DynamoDbClient {
                 ));
             }
         }
-        return Ok(());
+        Ok(())
     }
 }
 

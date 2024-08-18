@@ -14,13 +14,10 @@ pub async fn handler(command: &CreateSessionCommand) -> Result<String, LogicErro
     let db = get_dynamodb_client().await;
     let notifier = get_notifier().await;
 
-    println!("Loading connection");
     let mut connection = WebsocketItem::from_db(&command.connection_id, &db).await?;
-    println!("Checking session");
     let session_id = match connection.session_id {
         Some(session_id) => session_id,
         None => {
-            println!("Creating new session");
             let session_id = Uuid::new_v4().to_string();
             let session = SessionItem::new(&session_id, &command.connection_id);
             connection.session_id = Some(session_id.clone());
@@ -31,12 +28,7 @@ pub async fn handler(command: &CreateSessionCommand) -> Result<String, LogicErro
         }
     };
 
-    println!("Sending notification");
-    let message = Message {
-        action: ActionType::GetSession,
-        data: Some(json!(session_id.clone())),
-        error: None,
-    };
+    let message = Message::new(ActionType::GetSession, json!(session_id.clone()));
     notifier.notify(&connection.connection_id, &message).await?;
     Ok(session_id)
 }
@@ -91,8 +83,9 @@ mod tests {
         // Updates session item
         let session = SessionItem::from_db(&session_id, &db).await?;
         assert_eq!(session.connection_id, connection_id);
+        assert!(session.game_id.is_none());
         assert_eq!(session.modified_action, SessionAction::CreateConnection);
-        assert!(connection.modified_at > start_time);
+        assert!(session.modified_at > start_time);
         Ok(())
     }
 

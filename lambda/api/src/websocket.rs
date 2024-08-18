@@ -4,6 +4,7 @@ use service;
 
 pub enum RequestType {
     Connect(requests::CreateConnectionRequest),
+    CreateGame(requests::CreateGameRequest),
     CreateSession(requests::CreateSessionRequest),
     Disconnect(requests::DestroyConnectionRequest),
     SetNickname(requests::SetNicknameRequest),
@@ -25,6 +26,11 @@ pub fn get_request_type(route_key: &str, body_str: &str) -> Result<RequestType, 
     println!("Request action {}", request.action);
     println!("Request data {}", request.data);
     match request.action.as_str() {
+        "createGame" => {
+            let request: requests::CreateGameRequest = serde_json::from_value(request.data)
+                .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
+            Ok(RequestType::CreateGame(request))
+        }
         "getSession" => {
             let request: requests::CreateSessionRequest = serde_json::from_value(request.data)
                 .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
@@ -49,6 +55,10 @@ pub async fn route(request_type: &RequestType, connection_id: &str) -> Result<St
         RequestType::Connect(request) => {
             let command = request.to_command(connection_id);
             service::create_connection::handler(&command).await
+        }
+        RequestType::CreateGame(request) => {
+            let command = request.to_command(connection_id);
+            service::create_game::handler(&command).await
         }
         RequestType::CreateSession(request) => {
             let command = request.to_command(connection_id);

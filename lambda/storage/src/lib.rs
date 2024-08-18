@@ -6,6 +6,7 @@ pub mod dependency_injection;
 mod dynamodb_client_cloud;
 mod dynamodb_client_local;
 mod dynamodb_client_trait;
+pub mod game_table;
 pub mod session_table;
 pub mod websocket_table;
 pub mod database {

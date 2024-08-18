@@ -25,12 +25,10 @@ pub async fn handler(command: &SetSessionCommand) -> Result<String, LogicError> 
     session.modified_action = SessionAction::Reconnected;
 
     db.write(vec![session.save()?, connection.save()?]).await?;
-    let message = Message {
-        action: ActionType::GetSession,
-        data: Some(json!(command.session_id.clone())),
-        error: None,
-    };
+
+    let message = Message::new(ActionType::GetSession, json!(command.session_id.clone()));
     notifier.notify(&connection.connection_id, &message).await?;
+
     Ok(command.session_id.clone())
 }
 
@@ -38,7 +36,6 @@ pub async fn handler(command: &SetSessionCommand) -> Result<String, LogicError> 
 mod tests {
     use super::*;
     use crate::test_setup;
-    use domain::commands::SetSessionCommand;
     use uuid::Uuid;
 
     #[tokio::test]

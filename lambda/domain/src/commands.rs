@@ -16,6 +16,12 @@ pub struct CreateConnectionCommand {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct CreateGameCommand {
+    pub connection_id: String,
+    pub session_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CreateSessionCommand {
     pub connection_id: String,
 }
