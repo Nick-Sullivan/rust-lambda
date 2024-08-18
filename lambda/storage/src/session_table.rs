@@ -1,8 +1,42 @@
-use crate::attribute_value_parser::parse_attribute_value;
+use crate::attribute_value_parser::{parse_attribute_value, DATETIME_FORMAT};
 use crate::dynamodb_client::{DynamoDbClient, IDynamoDbClient};
 use aws_sdk_dynamodb::types::{AttributeValue, Get, Put, TransactGetItem, TransactWriteItem};
+use chrono::{DateTime, Utc};
 use domain::errors::LogicError;
 use std::{collections::HashMap, env};
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum SessionAction {
+    CreateConnection,
+    SetNickname,
+    JoinGame,
+    PendingTimeout,
+    Reconnected,
+}
+impl SessionAction {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SessionAction::CreateConnection => "CREATE_CONNECTION",
+            SessionAction::SetNickname => "SET_NICKNAME",
+            SessionAction::JoinGame => "JOIN_GAME",
+            SessionAction::PendingTimeout => "PENDING_TIMEOUT",
+            SessionAction::Reconnected => "RECONNECTED",
+        }
+    }
+
+    fn from_str(s: &str) -> Result<Self, LogicError> {
+        match s {
+            "CREATE_CONNECTION" => Ok(SessionAction::CreateConnection),
+            "SET_NICKNAME" => Ok(SessionAction::SetNickname),
+            "JOIN_GAME" => Ok(SessionAction::JoinGame),
+            "PENDING_TIMEOUT" => Ok(SessionAction::PendingTimeout),
+            "RECONNECTED" => Ok(SessionAction::Reconnected),
+            _ => Err(LogicError::DeserializationError(
+                "Invalid session action".to_string(),
+            )),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct SessionItem {
@@ -10,6 +44,8 @@ pub struct SessionItem {
     pub connection_id: String,
     pub nickname: Option<String>,
     pub version: i32,
+    pub modified_at: DateTime<Utc>,
+    pub modified_action: SessionAction,
 }
 
 impl SessionItem {
@@ -19,6 +55,8 @@ impl SessionItem {
             connection_id: connection_id.to_string(),
             nickname: None,
             version: 0,
+            modified_at: Utc::now(),
+            modified_action: SessionAction::CreateConnection,
         }
     }
 
@@ -37,11 +75,18 @@ impl SessionItem {
         let session_id = parse_attribute_value::<String>(hash_map.get("id"))?;
         let version = parse_attribute_value::<i32>(hash_map.get("version"))?;
         let nickname = parse_attribute_value::<Option<String>>(hash_map.get("nickname"))?;
+        let modified_at = parse_attribute_value::<DateTime<Utc>>(hash_map.get("modified_at"))?;
+        let modified_action = SessionAction::from_str(&parse_attribute_value::<String>(
+            hash_map.get("modified_action"),
+        )?)?;
+
         let item = SessionItem {
             connection_id,
             session_id,
             nickname,
             version,
+            modified_at,
+            modified_action,
         };
         Ok(item)
     }
@@ -68,7 +113,15 @@ impl SessionItem {
                 "connection_id",
                 AttributeValue::S(self.connection_id.to_string()),
             )
-            .item("version", AttributeValue::N(self.version.to_string()));
+            .item("version", AttributeValue::N(self.version.to_string()))
+            .item(
+                "modified_at",
+                AttributeValue::S(self.modified_at.format(DATETIME_FORMAT).to_string()),
+            )
+            .item(
+                "modified_action",
+                AttributeValue::S(self.modified_action.as_str().to_string()),
+            );
 
         let put_item = match self.nickname {
             Some(ref nickname) => {

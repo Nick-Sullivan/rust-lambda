@@ -18,7 +18,7 @@ pub struct DynamoDbClient {
     websocket_table: RwLock<HashMap<String, FakeItem>>,
 }
 
-#[cfg_attr(not(test), allow(unused))]
+#[cfg_attr(not(feature = "in_memory"), allow(unused))]
 impl DynamoDbClient {
     pub async fn new() -> Self {
         let game_table = RwLock::new(HashMap::new());

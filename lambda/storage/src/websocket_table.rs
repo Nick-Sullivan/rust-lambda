@@ -1,6 +1,7 @@
-use crate::attribute_value_parser::parse_attribute_value;
+use crate::attribute_value_parser::{parse_attribute_value, DATETIME_FORMAT};
 use crate::dynamodb_client::{DynamoDbClient, IDynamoDbClient};
 use aws_sdk_dynamodb::types::{AttributeValue, Get, Put, TransactGetItem, TransactWriteItem};
+use chrono::{DateTime, Utc};
 use domain::errors::LogicError;
 use std::{collections::HashMap, env};
 
@@ -9,7 +10,7 @@ pub struct WebsocketItem {
     pub connection_id: String,
     pub session_id: Option<String>,
     pub version: i32,
-    // modified_at: datetime = None
+    pub modified_at: DateTime<Utc>,
 }
 
 impl WebsocketItem {
@@ -18,6 +19,16 @@ impl WebsocketItem {
             connection_id: connection_id.to_string(),
             session_id: None,
             version: 0,
+            modified_at: Utc::now(),
+        }
+    }
+
+    pub fn new_with_session(connection_id: &str, session_id: &str) -> Self {
+        WebsocketItem {
+            connection_id: connection_id.to_string(),
+            session_id: Some(session_id.to_string()),
+            version: 0,
+            modified_at: Utc::now(),
         }
     }
 
@@ -35,10 +46,12 @@ impl WebsocketItem {
         let connection_id = parse_attribute_value::<String>(hash_map.get("connection_id"))?;
         let session_id = parse_attribute_value::<Option<String>>(hash_map.get("session_id"))?;
         let version = parse_attribute_value::<i32>(hash_map.get("version"))?;
+        let modified_at = parse_attribute_value::<DateTime<Utc>>(hash_map.get("modified_at"))?;
         let item = WebsocketItem {
             connection_id,
             session_id,
             version,
+            modified_at,
         };
         Ok(item)
     }
@@ -67,7 +80,11 @@ impl WebsocketItem {
                 "connection_id",
                 AttributeValue::S(self.connection_id.to_string()),
             )
-            .item("version", AttributeValue::N(self.version.to_string()));
+            .item("version", AttributeValue::N(self.version.to_string()))
+            .item(
+                "modified_at",
+                AttributeValue::S(self.modified_at.format(DATETIME_FORMAT).to_string()),
+            );
         let put_item = match self.session_id {
             Some(ref session_id) => {
                 put_item.item("session_id", AttributeValue::S(session_id.to_string()))

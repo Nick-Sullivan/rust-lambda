@@ -1,3 +1,4 @@
+use chrono::Utc;
 use domain::commands::CreateSessionCommand;
 use domain::errors::LogicError;
 use notifier::dependency_injection::get_notifier;
@@ -24,6 +25,7 @@ pub async fn handler(command: &CreateSessionCommand) -> Result<String, LogicErro
             let session = SessionItem::new(&session_id, &command.connection_id);
             connection.session_id = Some(session_id.clone());
             connection.version += 1;
+            connection.modified_at = Utc::now();
             db.write(vec![session.save()?, connection.save()?]).await?;
             session_id
         }
@@ -44,6 +46,7 @@ mod tests {
     use super::*;
     use crate::test_setup;
     use notifier::dependency_injection::get_notifier;
+    use storage::session_table::SessionAction;
 
     #[tokio::test]
     async fn errors_if_connection_doesnt_exist() {
@@ -58,6 +61,7 @@ mod tests {
     async fn creates_new_session() -> Result<(), LogicError> {
         test_setup::setup();
         let db = get_dynamodb_client().await;
+        let start_time = Utc::now();
 
         let connection_id = Uuid::new_v4().to_string();
         let connection = WebsocketItem::new(&connection_id);
@@ -76,14 +80,19 @@ mod tests {
         let messages = notifier.get_messages(&connection_id);
         assert_eq!(messages.len(), 1);
 
-        // Updates database tables
+        // Updates connection item
         let connection = WebsocketItem::from_db(&connection_id, &db).await?;
+        assert!(connection.modified_at > start_time);
         let session_id = match connection.session_id {
             Some(session_id) => session_id,
             None => return Err(LogicError::GetItemError("Session not found".to_string())),
         };
+
+        // Updates session item
         let session = SessionItem::from_db(&session_id, &db).await?;
         assert_eq!(session.connection_id, connection_id);
+        assert_eq!(session.modified_action, SessionAction::CreateConnection);
+        assert!(connection.modified_at > start_time);
         Ok(())
     }
 
@@ -94,21 +103,22 @@ mod tests {
 
         let connection_id = Uuid::new_v4().to_string();
         let session_id = Uuid::new_v4().to_string();
-        let connection = WebsocketItem {
-            connection_id: connection_id.to_string(),
-            session_id: Some(session_id.to_string()),
-            version: 0,
-        };
+        let connection = WebsocketItem::new_with_session(&connection_id, &session_id);
         let session = SessionItem::new(&session_id, &connection_id);
         db.write(vec![connection.save()?, session.save()?]).await?;
 
-        let request = CreateSessionCommand { connection_id };
-        let result = handler(&request).await;
-        let response = match result {
-            Ok(response) => response,
-            Err(error) => return Err(error),
+        let request = CreateSessionCommand {
+            connection_id: connection_id.clone(),
         };
-        assert_eq!(response, session_id);
+        let result = handler(&request).await?;
+        assert_eq!(result, session_id);
+
+        // Doesn't update database tables
+        let connection2 = WebsocketItem::from_db(&connection_id, &db).await?;
+        assert_eq!(connection2.version, connection.version);
+        let session2 = SessionItem::from_db(&session_id, &db).await?;
+        assert_eq!(session2.version, session.version);
+
         Ok(())
     }
 }

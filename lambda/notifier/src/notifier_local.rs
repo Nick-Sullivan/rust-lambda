@@ -7,7 +7,7 @@ pub struct Notifier {
     pub log: RwLock<HashMap<String, Vec<String>>>,
 }
 
-#[cfg_attr(not(test), allow(unused))]
+#[cfg_attr(not(feature = "in_memory"), allow(unused))]
 impl Notifier {
     pub async fn new() -> Self {
         let log = RwLock::new(HashMap::new());

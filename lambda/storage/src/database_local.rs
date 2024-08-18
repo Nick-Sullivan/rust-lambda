@@ -6,7 +6,7 @@ pub struct Database {
     counts: HashMap<String, NameCount>,
 }
 
-#[cfg_attr(not(test), allow(unused))]
+#[cfg_attr(not(feature = "in_memory"), allow(unused))]
 impl Database {
     pub async fn new() -> Self {
         let counts = HashMap::new();

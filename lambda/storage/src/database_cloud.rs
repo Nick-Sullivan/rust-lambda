@@ -1,6 +1,6 @@
 use crate::database::{INameDatabase, NameCount};
-use aws_config;
 use aws_config::meta::region::RegionProviderChain;
+use aws_config::{self, BehaviorVersion};
 use aws_sdk_dynamodb::{
     config::Region, operation::update_item::UpdateItemError, types::AttributeValue, Client,
 };
@@ -14,14 +14,17 @@ pub struct Database {
     table_name: String,
 }
 
-#[cfg_attr(test, allow(unused))]
+#[cfg_attr(feature = "in_memory", allow(unused))]
 impl Database {
     pub async fn new() -> Self {
         let region_name = env::var("AWS_REGION").unwrap_or_else(|_| "".to_string());
         let table_name = env::var("TABLE_NAME").unwrap_or_else(|_| "".to_string());
         let region_provider =
             RegionProviderChain::first_try(Region::new(region_name)).or_default_provider();
-        let config = aws_config::from_env().region(region_provider).load().await;
+        let config = aws_config::defaults(BehaviorVersion::latest())
+            .region(region_provider)
+            .load()
+            .await;
         let client = Client::new(&config);
         Database { client, table_name }
     }

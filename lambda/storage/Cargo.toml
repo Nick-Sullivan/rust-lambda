@@ -13,3 +13,5 @@ aws-config = "1.5.4"
 aws-sdk-dynamodb = "1.37.0"
 aws-smithy-runtime-api = "1.7.1"
 tokio = { version = "1", features = ["full"] }
+trait-variant = "0.1.2"
+chrono = "0.4.38"

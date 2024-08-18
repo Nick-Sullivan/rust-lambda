@@ -1,3 +1,4 @@
+use chrono::Utc;
 use domain::commands::SetNicknameCommand;
 use domain::errors::LogicError;
 use notifier::dependency_injection::get_notifier;
@@ -6,7 +7,7 @@ use serde_json::json;
 use std::collections::HashSet;
 use storage::dependency_injection::get_dynamodb_client;
 use storage::dynamodb_client::IDynamoDbClient;
-use storage::session_table::SessionItem;
+use storage::session_table::{SessionAction, SessionItem};
 
 pub async fn handler(command: &SetNicknameCommand) -> Result<String, LogicError> {
     let db = get_dynamodb_client().await;
@@ -18,6 +19,9 @@ pub async fn handler(command: &SetNicknameCommand) -> Result<String, LogicError>
     if is_valid {
         session.nickname = Some(command.nickname.clone());
         session.version += 1;
+        session.modified_at = Utc::now();
+        session.modified_action = SessionAction::SetNickname;
+
         db.write_single(session.save()?).await?;
         let message = create_success_message(&command.session_id, &command.nickname);
         notifier.notify(&session.connection_id, &message).await?;
@@ -60,6 +64,7 @@ mod tests {
     use super::*;
     use crate::test_setup;
     use domain::commands::SetNicknameCommand;
+    use storage::session_table::SessionAction;
     use uuid::Uuid;
 
     #[tokio::test]
@@ -114,6 +119,7 @@ mod tests {
     async fn updates_session() -> Result<(), LogicError> {
         test_setup::setup();
         let db = get_dynamodb_client().await;
+        let start_time = Utc::now();
 
         let connection_id = Uuid::new_v4().to_string();
         let session_id = Uuid::new_v4().to_string();
@@ -141,6 +147,8 @@ mod tests {
         let session = SessionItem::from_db(&session_id, &db).await?;
         assert!(session.nickname.is_some());
         assert_eq!(session.nickname.unwrap(), nickname);
+        assert!(session.modified_at > start_time);
+        assert_eq!(session.modified_action, SessionAction::SetNickname);
         Ok(())
     }
 }

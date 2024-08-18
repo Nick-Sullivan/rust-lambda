@@ -16,6 +16,8 @@ impl NameCount {
         }
     }
 }
+
+#[trait_variant::make(HttpService: Send)]
 pub trait INameDatabase {
     async fn get(&self, name: &str) -> Result<NameCount, LogicError>;
     async fn save(&mut self, item: &NameCount) -> Result<(), LogicError>;

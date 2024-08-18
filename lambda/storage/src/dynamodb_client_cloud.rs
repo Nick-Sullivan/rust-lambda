@@ -1,6 +1,6 @@
 use crate::dynamodb_client::IDynamoDbClient;
-use aws_config;
 use aws_config::meta::region::RegionProviderChain;
+use aws_config::{self, BehaviorVersion};
 use aws_sdk_dynamodb::types::{ItemResponse, TransactGetItem, TransactWriteItem};
 use aws_sdk_dynamodb::{config::Region, Client};
 use domain::errors::LogicError;
@@ -11,13 +11,16 @@ pub struct DynamoDbClient {
     client: Client,
 }
 
-#[cfg_attr(test, allow(unused))]
+#[cfg_attr(feature = "in_memory", allow(unused))]
 impl DynamoDbClient {
     pub async fn new() -> Self {
         let region_name = env::var("AWS_REGION").unwrap_or_else(|_| "".to_string());
         let region_provider =
             RegionProviderChain::first_try(Region::new(region_name)).or_default_provider();
-        let config = aws_config::from_env().region(region_provider).load().await;
+        let config = aws_config::defaults(BehaviorVersion::latest())
+            .region(region_provider)
+            .load()
+            .await;
         let client = Client::new(&config);
         DynamoDbClient { client }
     }
