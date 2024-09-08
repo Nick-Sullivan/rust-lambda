@@ -1,13 +1,12 @@
 use domain::commands::SayHelloCommand;
 use domain::errors::LogicError;
-use storage::database::INameDatabase;
-use storage::dependency_injection::get_database;
+use storage::INameDatabase;
 
 pub async fn handler(command: &SayHelloCommand) -> Result<String, LogicError> {
     if command.name == "Nick" {
         return Err(LogicError::NotAllowed);
     }
-    let db = get_database().await;
+    let db = storage::get_database().await;
     let mut db_lock = db.lock().await;
     let mut item = db_lock.get(&command.name).await?;
     item.count += 1;
@@ -20,7 +19,7 @@ pub async fn handler(command: &SayHelloCommand) -> Result<String, LogicError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use storage::database::NameCount;
+    use storage::NameCount;
 
     #[tokio::test]
     async fn test_initial_hello() {
@@ -42,7 +41,7 @@ mod tests {
             count: 1,
             version: 0,
         };
-        let db = get_database().await;
+        let db = storage::get_database().await;
         let mut db_lock = db.lock().await;
         let _ = db_lock.save(&item).await;
         drop(db_lock);

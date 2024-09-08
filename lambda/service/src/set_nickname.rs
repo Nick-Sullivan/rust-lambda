@@ -1,26 +1,24 @@
 use chrono::Utc;
 use domain::commands::SetNicknameCommand;
 use domain::errors::LogicError;
-use notifier::dependency_injection::get_notifier;
-use notifier::notifier::{ActionType, INotifier, Message};
-use serde_json::json;
+use notifier::{self, ActionType, INotifier, Message, SetNicknameMessage};
 use std::collections::HashSet;
-use storage::dependency_injection::get_dynamodb_client;
-use storage::dynamodb_client::IDynamoDbClient;
 use storage::session_table::{SessionAction, SessionItem};
+use storage::IDynamoDbClient;
 
 pub async fn handler(command: &SetNicknameCommand) -> Result<String, LogicError> {
-    let db = get_dynamodb_client().await;
-    let notifier = get_notifier().await;
+    let db = storage::get().await;
+    let notifier = notifier::get().await;
 
     let mut session = SessionItem::from_db(&command.session_id, &db).await?;
 
     let is_valid = is_valid_nickname(&command.nickname);
     if is_valid {
+        session.account_id = command.account_id.clone();
+        session.modified_action = SessionAction::SetNickname;
+        session.modified_at = Utc::now();
         session.nickname = Some(command.nickname.clone());
         session.version += 1;
-        session.modified_at = Utc::now();
-        session.modified_action = SessionAction::SetNickname;
 
         db.write_single(session.save()?).await?;
         let message = create_success_message(&command.session_id, &command.nickname);
@@ -44,17 +42,17 @@ fn is_valid_nickname(nickname: &str) -> bool {
 }
 
 fn create_success_message(session_id: &str, nickname: &str) -> Message {
-    Message::new(
-        ActionType::SetNickname,
-        json!({"nickname": nickname, "playerId": session_id}),
-    )
+    let nickname_message = SetNicknameMessage {
+        nickname: nickname.to_string(),
+        player_id: session_id.to_string(),
+    };
+    Message::new(ActionType::SetNickname(nickname_message))
 }
 
 fn create_failure_message() -> Message {
-    Message::new_err(
-        ActionType::SetNickname,
-        json!("Invalid nickname".to_string()),
-    )
+    Message::new_err(ActionType::SetNicknameFailure(
+        "Invalid nickname".to_string(),
+    ))
 }
 
 #[cfg(test)]
@@ -69,7 +67,9 @@ mod tests {
         let nickname = "nickname".to_string();
         let connection_id = Uuid::new_v4().to_string();
         let session_id = Uuid::new_v4().to_string();
+        let account_id = None;
         let request = SetNicknameCommand {
+            account_id,
             connection_id,
             session_id,
             nickname,
@@ -81,7 +81,7 @@ mod tests {
     #[tokio::test]
     async fn aborts_if_nickname_is_invalid() -> Result<(), LogicError> {
         test_setup::setup();
-        let db = get_dynamodb_client().await;
+        let db = storage::get().await;
 
         let connection_id = Uuid::new_v4().to_string();
         let session_id = Uuid::new_v4().to_string();
@@ -91,6 +91,7 @@ mod tests {
 
         let nickname = "1".to_string();
         let request = SetNicknameCommand {
+            account_id: None,
             connection_id: connection_id.clone(),
             session_id: session_id.clone(),
             nickname: nickname.clone(),
@@ -101,7 +102,7 @@ mod tests {
         assert!(result.is_ok(), "Error: {:?}", result.err());
 
         // Notifies the connection
-        let notifier = get_notifier().await;
+        let notifier = notifier::get().await;
         let messages = notifier.get_messages(&connection_id);
         assert_eq!(messages.len(), 1);
 
@@ -114,9 +115,10 @@ mod tests {
     #[tokio::test]
     async fn updates_session() -> Result<(), LogicError> {
         test_setup::setup();
-        let db = get_dynamodb_client().await;
+        let db = storage::get().await;
         let start_time = Utc::now();
 
+        let account_id = Uuid::new_v4().to_string();
         let connection_id = Uuid::new_v4().to_string();
         let session_id = Uuid::new_v4().to_string();
         let session = SessionItem::new(&session_id, &connection_id);
@@ -125,6 +127,7 @@ mod tests {
 
         let nickname = "nickname".to_string();
         let request = SetNicknameCommand {
+            account_id: Some(account_id.clone()),
             connection_id: connection_id.clone(),
             session_id: session_id.clone(),
             nickname: nickname.clone(),
@@ -135,12 +138,14 @@ mod tests {
         assert!(result.is_ok(), "Error: {:?}", result.err());
 
         // Notifies the connection
-        let notifier = get_notifier().await;
+        let notifier = notifier::get().await;
         let messages = notifier.get_messages(&connection_id);
         assert_eq!(messages.len(), 1);
 
         // Updates database tables
         let session = SessionItem::from_db(&session_id, &db).await?;
+        assert!(session.account_id.is_some());
+        assert_eq!(session.account_id.unwrap(), account_id);
         assert!(session.nickname.is_some());
         assert_eq!(session.nickname.unwrap(), nickname);
         assert!(session.modified_at > start_time);

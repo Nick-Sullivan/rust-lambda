@@ -1,7 +1,8 @@
-use crate::notifier::{INotifier, Message};
+use crate::{INotifier, Message};
 use aws_config::{meta::region::RegionProviderChain, BehaviorVersion};
 use aws_sdk_apigatewaymanagement::{config::Region, primitives::Blob, Client};
 use domain::errors::LogicError;
+use serde_json::json;
 use std::env;
 
 pub struct Notifier {
@@ -27,12 +28,25 @@ impl Notifier {
 
 impl INotifier for Notifier {
     async fn notify(&self, connection_id: &str, message: &Message) -> Result<(), LogicError> {
-        let data = serde_json::to_string(message)
+        let message_value = if message.is_error {
+            json!({
+                "action": message.action.to_string(),
+                "error": message.action.get_value()?,
+            })
+        } else {
+            json!({
+                "action": message.action.to_string(),
+                "data": message.action.get_value()?,
+            })
+        };
+
+        let message_string = serde_json::to_string(&message_value)
             .map_err(|e| LogicError::SerializationError(e.to_string()))?;
+
         self.client
             .post_to_connection()
             .connection_id(connection_id)
-            .data(Blob::new(data.as_bytes().to_vec()))
+            .data(Blob::new(message_string.as_bytes().to_vec()))
             .send()
             .await
             .map_err(|e| LogicError::WebsocketError(e.to_string()))?;

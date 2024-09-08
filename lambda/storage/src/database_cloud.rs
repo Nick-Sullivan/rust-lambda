@@ -1,4 +1,4 @@
-use crate::database::{INameDatabase, NameCount};
+use crate::{INameDatabase, NameCount};
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::{self, BehaviorVersion};
 use aws_sdk_dynamodb::{

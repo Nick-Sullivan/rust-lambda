@@ -1,10 +1,12 @@
 use crate::attribute_value_parser::{parse_attribute_value, DATETIME_FORMAT};
-use crate::dynamodb_client::{DynamoDbClient, IDynamoDbClient};
+use crate::{DynamoDbClient, IDynamoDbClient};
 use aws_sdk_dynamodb::types::{AttributeValue, Get, Put, TransactGetItem, TransactWriteItem};
 use chrono::{DateTime, Utc};
 use domain::errors::LogicError;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
+use serde_json;
 use std::{collections::HashMap, env};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -47,6 +49,36 @@ impl GameAction {
     }
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+pub struct PlayerItem {
+    pub player_id: String,
+    pub account_id: Option<String>,
+    pub nickname: String,
+    pub win_counter: i32,
+    pub finished: bool,
+    // pub outcome: RollResultNote,
+    // pub rolls: Vec<i32>,
+    // pub connection_status: ConnectionStatus,
+}
+
+impl PlayerItem {
+    pub fn new(player_id: &str, account_id: &Option<String>, nickname: &str) -> Self {
+        PlayerItem {
+            player_id: player_id.to_string(),
+            account_id: account_id.clone(),
+            nickname: nickname.to_string(),
+            win_counter: 0,
+            finished: false,
+        }
+    }
+    pub fn vec_from_string(json_str: &str) -> Result<Vec<Self>, LogicError> {
+        serde_json::from_str(json_str).map_err(|e| LogicError::DeserializationError(e.to_string()))
+    }
+    pub fn vec_to_string(players: &Vec<Self>) -> Result<String, LogicError> {
+        serde_json::to_string(players).map_err(|e| LogicError::SerializationError(e.to_string()))
+    }
+}
+
 #[derive(Clone)]
 pub struct GameItem {
     pub game_id: String,
@@ -54,7 +86,7 @@ pub struct GameItem {
     pub modified_at: DateTime<Utc>,
     pub modified_by: String,
     pub mr_eleven: Option<String>,
-    // pub players: Vec<Player>,
+    pub players: Vec<PlayerItem>,
     pub round_finished: bool,
     // pub round_id: i32,
     // pub spectators: Vec<Spectator>,
@@ -69,6 +101,7 @@ impl GameItem {
             modified_at: Utc::now(),
             modified_by: session_id.to_string(),
             mr_eleven: None,
+            players: Vec::new(),
             round_finished: false,
             version: 0,
         }
@@ -92,6 +125,8 @@ impl GameItem {
         let modified_at = parse_attribute_value::<DateTime<Utc>>(hash_map.get("modified_at"))?;
         let modified_by = parse_attribute_value::<String>(hash_map.get("modified_by"))?;
         let mr_eleven = parse_attribute_value::<Option<String>>(hash_map.get("mr_eleven"))?;
+        let players_str = parse_attribute_value::<String>(hash_map.get("players"))?;
+        let players = PlayerItem::vec_from_string(&players_str)?;
         let round_finished = parse_attribute_value::<bool>(hash_map.get("round_finished"))?;
         let version = parse_attribute_value::<i32>(hash_map.get("version"))?;
 
@@ -101,6 +136,7 @@ impl GameItem {
             modified_at,
             modified_by,
             mr_eleven,
+            players,
             round_finished,
             version,
         };
@@ -143,6 +179,10 @@ impl GameItem {
                 AttributeValue::S(self.modified_at.format(DATETIME_FORMAT).to_string()),
             )
             .item("modified_by", AttributeValue::S(self.modified_by.clone()))
+            .item(
+                "players",
+                AttributeValue::S(PlayerItem::vec_to_string(&self.players)?),
+            )
             .item("version", AttributeValue::N(self.version.to_string()))
             .item("round_finished", AttributeValue::Bool(self.round_finished));
 
@@ -168,6 +208,16 @@ impl GameItem {
             .build()
             .map_err(|e| LogicError::UpdateItemError(e.to_string()))?;
         let transaction_item = TransactWriteItem::builder().put(put_item).build();
+        Ok(transaction_item)
+    }
+
+    pub fn delete(&self) -> Result<TransactWriteItem, LogicError> {
+        let delete_item = aws_sdk_dynamodb::types::Delete::builder()
+            .table_name(Self::get_table_name())
+            .key("id", AttributeValue::S(self.game_id.to_string()))
+            .build()
+            .map_err(|e| LogicError::DeleteItemError(e.to_string()))?;
+        let transaction_item = TransactWriteItem::builder().delete(delete_item).build();
         Ok(transaction_item)
     }
 }

@@ -1,13 +1,12 @@
 use domain::commands::SayGoodbyeCommand;
 use domain::errors::LogicError;
-use storage::database::INameDatabase;
-use storage::dependency_injection::get_database;
+use storage::INameDatabase;
 
 pub async fn handler(command: &SayGoodbyeCommand) -> Result<String, LogicError> {
     if command.name == "Nick" {
         return Err(LogicError::NotAllowed);
     }
-    let db = get_database().await;
+    let db = storage::get_database().await;
     let mut db_lock = db.lock().await;
     let item = db_lock.get(&command.name).await?;
     let message = format!("Goodbye {0}, {1} times", command.name, item.count);
@@ -19,7 +18,7 @@ pub async fn handler(command: &SayGoodbyeCommand) -> Result<String, LogicError> 
 mod tests {
     use super::*;
     use std::mem::drop;
-    use storage::database::NameCount;
+    use storage::NameCount;
 
     #[tokio::test]
     async fn test_initial_goodbye() {
@@ -41,7 +40,7 @@ mod tests {
             count: 1,
             version: 0,
         };
-        let db = get_database().await;
+        let db = storage::get_database().await;
         let mut db_lock = db.lock().await;
         let _ = db_lock.save(&item).await;
         drop(db_lock);

@@ -1,6 +1,5 @@
-use lambda_http;
 use lambda_http::request::RequestContext;
-use lambda_http::{Body, Error, Request, RequestExt, Response};
+use lambda_http::{self, Body, Error, Request, RequestExt, Response};
 mod api;
 mod websocket;
 

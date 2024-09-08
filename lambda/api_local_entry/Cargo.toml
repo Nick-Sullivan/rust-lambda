@@ -3,6 +3,10 @@ name = "api_local_entry"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "api_local_entry"
+path = "src/main.rs"
+
 [dependencies]
 api = { path = "../api" }
 domain = { path = "../domain" }

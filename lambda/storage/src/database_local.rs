@@ -1,4 +1,4 @@
-use crate::database::{INameDatabase, NameCount};
+use crate::{INameDatabase, NameCount};
 use domain::errors::LogicError;
 use std::collections::HashMap;
 

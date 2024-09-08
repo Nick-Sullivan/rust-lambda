@@ -1,17 +1,16 @@
 use chrono::Utc;
 use domain::commands::SetSessionCommand;
 use domain::errors::LogicError;
-use notifier::dependency_injection::get_notifier;
-use notifier::notifier::{ActionType, INotifier, Message};
-use serde_json::json;
-use storage::dependency_injection::get_dynamodb_client;
-use storage::dynamodb_client::IDynamoDbClient;
+use notifier::{self, ActionType, INotifier, Message};
 use storage::session_table::{SessionAction, SessionItem};
 use storage::websocket_table::WebsocketItem;
+use storage::IDynamoDbClient;
 
 pub async fn handler(command: &SetSessionCommand) -> Result<String, LogicError> {
-    let db = get_dynamodb_client().await;
-    let notifier = get_notifier().await;
+    let db = storage::get().await;
+    let notifier = notifier::get().await;
+
+    // TODO: if session doesnt exist, create a new one instead
 
     let mut connection = WebsocketItem::from_db(&command.connection_id, &db).await?;
     connection.session_id = Some(command.session_id.clone());
@@ -24,11 +23,14 @@ pub async fn handler(command: &SetSessionCommand) -> Result<String, LogicError> 
     session.modified_at = Utc::now();
     session.modified_action = SessionAction::Reconnected;
 
+    println!("Saving to database");
     db.write(vec![session.save()?, connection.save()?]).await?;
 
-    let message = Message::new(ActionType::GetSession, json!(command.session_id.clone()));
+    println!("Notifying connections");
+    let message = Message::new(ActionType::GetSession(command.session_id.clone()));
     notifier.notify(&connection.connection_id, &message).await?;
 
+    println!("Returning");
     Ok(command.session_id.clone())
 }
 
@@ -54,7 +56,7 @@ mod tests {
     #[tokio::test]
     async fn updates_session() -> Result<(), LogicError> {
         test_setup::setup();
-        let db = get_dynamodb_client().await;
+        let db = storage::get().await;
         let start_time = Utc::now();
 
         let old_connection_id = Uuid::new_v4().to_string();
@@ -76,7 +78,7 @@ mod tests {
         assert!(result.is_ok(), "Error: {:?}", result.err());
 
         // Notifies the connection
-        let notifier = get_notifier().await;
+        let notifier = notifier::get().await;
         let messages = notifier.get_messages(&connection_id);
         assert_eq!(messages.len(), 1);
 

@@ -24,6 +24,12 @@ cargo lambda watch --only-lambda-apis
 cargo lambda invoke --data-file request.json
 ```
 
+# Test
+
+```bash
+cargo test --features "in_memory"
+```
+
 # Deploy
 
 ```bash

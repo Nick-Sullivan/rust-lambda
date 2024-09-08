@@ -38,7 +38,7 @@ resource "aws_api_gateway_stage" "gateway" {
 
 resource "aws_lambda_permission" "gateway" {
   depends_on    = [aws_api_gateway_deployment.gateway]
-  function_name = local.prefix
+  function_name = "${local.prefix}-HTTP"
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
   principal     = "apigateway.amazonaws.com"

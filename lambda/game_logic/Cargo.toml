@@ -1,0 +1,11 @@
+[package]
+name = "game_logic"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+in_memory = []
+
+[dependencies]
+domain = { path = "../domain" }
+storage = { path = "../storage" }

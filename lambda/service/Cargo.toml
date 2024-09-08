@@ -8,6 +8,8 @@ in_memory = []
 
 [dependencies]
 domain = { path = "../domain" }
+event_publisher = { path = "../event_publisher" }
+game_logic = { path = "../game_logic" }
 notifier = { path = "../notifier" }
 storage = { path = "../storage" }
 

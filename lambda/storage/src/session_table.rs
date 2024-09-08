@@ -1,5 +1,5 @@
 use crate::attribute_value_parser::{parse_attribute_value, DATETIME_FORMAT};
-use crate::dynamodb_client::{DynamoDbClient, IDynamoDbClient};
+use crate::{DynamoDbClient, IDynamoDbClient};
 use aws_sdk_dynamodb::types::{AttributeValue, Get, Put, TransactGetItem, TransactWriteItem};
 use chrono::{DateTime, Utc};
 use domain::errors::LogicError;
@@ -40,6 +40,7 @@ impl SessionAction {
 
 #[derive(Clone)]
 pub struct SessionItem {
+    pub account_id: Option<String>,
     pub connection_id: String,
     pub game_id: Option<String>,
     pub modified_at: DateTime<Utc>,
@@ -52,6 +53,7 @@ pub struct SessionItem {
 impl SessionItem {
     pub fn new(session_id: &str, connection_id: &str) -> Self {
         SessionItem {
+            account_id: None,
             connection_id: connection_id.to_string(),
             game_id: None,
             nickname: None,
@@ -73,6 +75,7 @@ impl SessionItem {
     }
 
     pub fn from_map(hash_map: &HashMap<String, AttributeValue>) -> Result<Self, LogicError> {
+        let account_id = parse_attribute_value::<Option<String>>(hash_map.get("account_id"))?;
         let connection_id = parse_attribute_value::<String>(hash_map.get("connection_id"))?;
         let game_id = parse_attribute_value::<Option<String>>(hash_map.get("game_id"))?;
         let modified_at = parse_attribute_value::<DateTime<Utc>>(hash_map.get("modified_at"))?;
@@ -84,6 +87,7 @@ impl SessionItem {
         let version = parse_attribute_value::<i32>(hash_map.get("version"))?;
 
         let item = SessionItem {
+            account_id,
             connection_id,
             game_id,
             modified_at,
@@ -127,6 +131,13 @@ impl SessionItem {
             )
             .item("version", AttributeValue::N(self.version.to_string()));
 
+        let put_item = match self.account_id {
+            Some(ref account_id) => {
+                put_item.item("account_id", AttributeValue::S(account_id.to_string()))
+            }
+            None => put_item,
+        };
+
         let put_item = match self.game_id {
             Some(ref game_id) => put_item.item("game_id", AttributeValue::S(game_id.to_string())),
             None => put_item,
@@ -154,6 +165,16 @@ impl SessionItem {
             .build()
             .map_err(|e| LogicError::UpdateItemError(e.to_string()))?;
         let transaction_item = TransactWriteItem::builder().put(put_item).build();
+        Ok(transaction_item)
+    }
+
+    pub fn delete(&self) -> Result<TransactWriteItem, LogicError> {
+        let delete_item = aws_sdk_dynamodb::types::Delete::builder()
+            .table_name(Self::get_table_name())
+            .key("id", AttributeValue::S(self.session_id.to_string()))
+            .build()
+            .map_err(|e| LogicError::DeleteItemError(e.to_string()))?;
+        let transaction_item = TransactWriteItem::builder().delete(delete_item).build();
         Ok(transaction_item)
     }
 }

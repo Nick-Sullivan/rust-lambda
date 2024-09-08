@@ -6,7 +6,10 @@ pub enum LogicError {
     ConditionalCheckFailed(String),
     DeleteItemError(String),
     DeserializationError(String),
+    EventPublishingError(String),
     GetItemError(String),
+    InvalidGameState(String),
+    LambdaError(String),
     NotAllowed,
     ParseItemError(String),
     RestError(String),
@@ -25,7 +28,12 @@ impl fmt::Display for LogicError {
             LogicError::DeserializationError(ref msg) => {
                 write!(f, "[DeserializationError] {}", msg)
             }
+            LogicError::EventPublishingError(ref msg) => {
+                write!(f, "[EventPublishingError] {}", msg)
+            }
             LogicError::GetItemError(ref msg) => write!(f, "[GetItemError] {}", msg),
+            LogicError::InvalidGameState(ref msg) => write!(f, "[InvalidGameState] {}", msg),
+            LogicError::LambdaError(ref msg) => write!(f, "[LambdaError] {}", msg),
             LogicError::NotAllowed => write!(f, "[NotAllowed]"),
             LogicError::ParseItemError(ref msg) => write!(f, "[ParseError] {}", msg),
             LogicError::RestError(ref msg) => write!(f, "[RestError] {}", msg),

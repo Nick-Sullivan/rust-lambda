@@ -1,5 +1,5 @@
 use crate::attribute_value_parser::{parse_attribute_value, DATETIME_FORMAT};
-use crate::dynamodb_client::{DynamoDbClient, IDynamoDbClient};
+use crate::{DynamoDbClient, IDynamoDbClient};
 use aws_sdk_dynamodb::types::{AttributeValue, Get, Put, TransactGetItem, TransactWriteItem};
 use chrono::{DateTime, Utc};
 use domain::errors::LogicError;

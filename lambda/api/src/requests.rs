@@ -72,13 +72,16 @@ impl DestroyConnectionRequest {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SetNicknameRequest {
+    #[serde(rename = "accountId")]
+    pub account_id: Option<String>,
+    pub nickname: String,
     #[serde(rename = "sessionId")]
     pub session_id: String,
-    pub nickname: String,
 }
 impl SetNicknameRequest {
     pub fn to_command(&self, connection_id: &str) -> commands::SetNicknameCommand {
         commands::SetNicknameCommand {
+            account_id: self.account_id.clone(),
             connection_id: connection_id.to_string(),
             session_id: self.session_id.clone(),
             nickname: self.nickname.clone(),

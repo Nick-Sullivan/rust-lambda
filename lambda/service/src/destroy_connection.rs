@@ -1,13 +1,16 @@
 use chrono::Utc;
 use domain::commands::DestroyConnectionCommand;
 use domain::errors::LogicError;
-use storage::dependency_injection::get_dynamodb_client;
-use storage::dynamodb_client::IDynamoDbClient;
+use event_publisher::{self, EventMessage, IEventPublisher};
+use serde_json::json;
 use storage::session_table::{SessionAction, SessionItem};
 use storage::websocket_table::WebsocketItem;
+use storage::IDynamoDbClient;
 
 pub async fn handler(command: &DestroyConnectionCommand) -> Result<String, LogicError> {
-    let db = get_dynamodb_client().await;
+    let db = storage::get().await;
+    let event_publisher = event_publisher::get().await;
+
     let connection = WebsocketItem::from_db(&command.connection_id, &db).await?;
     match &connection.session_id {
         Some(session_id) => {
@@ -17,6 +20,13 @@ pub async fn handler(command: &DestroyConnectionCommand) -> Result<String, Logic
             session.version += 1;
             db.write(vec![connection.delete()?, session.save()?])
                 .await?;
+
+            let event_message = EventMessage {
+                source: "RustLambda-Dev.Websocket".to_string(),
+                detail_type: "Disconnected".to_string(),
+                detail: json!({"session_id": session_id}),
+            };
+            event_publisher.publish(&event_message).await?;
         }
         None => {
             db.write_single(connection.delete()?).await?;
@@ -43,7 +53,7 @@ mod tests {
     #[tokio::test]
     async fn destroys_connection() -> Result<(), LogicError> {
         test_setup::setup();
-        let db = get_dynamodb_client().await;
+        let db = storage::get().await;
 
         let connection_id = Uuid::new_v4().to_string();
         let connection = WebsocketItem::new(&connection_id);
@@ -64,7 +74,7 @@ mod tests {
     #[tokio::test]
     async fn disconnects_session() -> Result<(), LogicError> {
         test_setup::setup();
-        let db = get_dynamodb_client().await;
+        let db = storage::get().await;
         let start_time = Utc::now();
 
         let connection_id = Uuid::new_v4().to_string();
@@ -87,6 +97,12 @@ mod tests {
         let session = SessionItem::from_db(&session_id, &db).await?;
         assert_eq!(session.modified_action, SessionAction::PendingTimeout);
         assert!(session.modified_at > start_time);
+
+        // Publishes event
+        let event_publisher = event_publisher::get().await;
+        let messages = event_publisher.get_messages("RustLambda-Dev.Websocket");
+        assert_eq!(messages.len(), 1);
+
         Ok(())
     }
 }

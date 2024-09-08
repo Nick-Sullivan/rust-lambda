@@ -1,25 +1,29 @@
+use crate::send_game_state_notification;
 use chrono::Utc;
-use domain::commands::CreateGameCommand;
+use domain::commands::{CreateGameCommand, SendGameStateNotificationCommand};
 use domain::errors::LogicError;
-use notifier::dependency_injection::get_notifier;
-use notifier::notifier::{ActionType, INotifier, Message};
+use event_publisher::{self, EventMessage, IEventPublisher};
+use notifier::{self, ActionType, INotifier, Message};
 use serde_json::json;
-use storage::dependency_injection::get_dynamodb_client;
-use storage::dynamodb_client::IDynamoDbClient;
-use storage::game_table::GameItem;
+use storage::game_table::{GameItem, PlayerItem};
 use storage::session_table::{SessionAction, SessionItem};
+use storage::IDynamoDbClient;
 
 pub async fn handler(command: &CreateGameCommand) -> Result<String, LogicError> {
-    let db = get_dynamodb_client().await;
-    let notifier = get_notifier().await;
-
-    let game_id = GameItem::create_game_code();
-    let game = GameItem::new(&game_id, &command.session_id);
+    let db = storage::get().await;
+    let event_publisher = event_publisher::get().await;
+    let notifier = notifier::get().await;
 
     let mut session = SessionItem::from_db(&command.session_id, &db).await?;
+    let nickname = session.nickname.clone().ok_or(LogicError::NotAllowed)?;
     if session.game_id.is_some() {
         return Ok("Already in game".to_string());
     }
+
+    let game_id = GameItem::create_game_code();
+    let mut game = GameItem::new(&game_id, &command.session_id);
+    let player = PlayerItem::new(&session.session_id, &session.account_id, &nickname);
+    game.players.push(player);
     session.game_id = Some(game_id.clone());
     session.modified_action = SessionAction::JoinGame;
     session.modified_at = Utc::now();
@@ -27,12 +31,23 @@ pub async fn handler(command: &CreateGameCommand) -> Result<String, LogicError> 
 
     db.write(vec![game.save()?, session.save()?]).await?;
 
-    let message = Message::new(ActionType::JoinGame, json!(game_id.clone()));
+    println!("Sending new game response");
+    let message = Message::new(ActionType::JoinGame(game_id.clone()));
     notifier.notify(&command.connection_id, &message).await?;
 
-    // Notify game state
+    println!("Sending game state notification");
+    let command = SendGameStateNotificationCommand {
+        game_id: game_id.clone(),
+    };
+    send_game_state_notification::handler(&command).await?;
 
-    // Publish event
+    println!("Sending event message");
+    let event_message = EventMessage {
+        source: "RustLambda-Dev.GameCreated".to_string(),
+        detail_type: "Game created".to_string(),
+        detail: json!({"game_id": game_id}),
+    };
+    event_publisher.publish(&event_message).await?;
 
     Ok(game_id)
 }
@@ -41,7 +56,7 @@ pub async fn handler(command: &CreateGameCommand) -> Result<String, LogicError> 
 mod tests {
     use super::*;
     use crate::test_setup;
-    use storage::game_table::GameAction;
+    use storage::{game_table::GameAction, websocket_table::WebsocketItem};
     use uuid::Uuid;
 
     #[tokio::test]
@@ -58,10 +73,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn creates_new_game() -> Result<(), LogicError> {
+    async fn errors_if_nickname_not_set() -> Result<(), LogicError> {
         test_setup::setup();
-        let db = get_dynamodb_client().await;
-        let start_time = Utc::now();
+        let db = storage::get().await;
 
         let connection_id = Uuid::new_v4().to_string();
         let session_id = Uuid::new_v4().to_string();
@@ -72,12 +86,34 @@ mod tests {
             connection_id: connection_id.clone(),
             session_id: session_id.clone(),
         };
+        let result = handler(&request).await;
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn creates_new_game() -> Result<(), LogicError> {
+        test_setup::setup();
+        let db = storage::get().await;
+        let start_time = Utc::now();
+
+        let connection_id = Uuid::new_v4().to_string();
+        let session_id = Uuid::new_v4().to_string();
+        let connection = WebsocketItem::new(&connection_id);
+        let mut session = SessionItem::new(&session_id, &connection_id);
+        session.nickname = Some("Test".to_string());
+        db.write(vec![connection.save()?, session.save()?]).await?;
+
+        let request = CreateGameCommand {
+            connection_id: connection_id.clone(),
+            session_id: session_id.clone(),
+        };
         let game_id = handler(&request).await?;
 
-        // Notifies the connection
-        let notifier = get_notifier().await;
+        // Notifies the connection (1 for new game, 1 for game state)
+        let notifier = notifier::get().await;
         let messages = notifier.get_messages(&connection_id);
-        assert_eq!(messages.len(), 1);
+        assert_eq!(messages.len(), 2);
 
         // Creates game item
         let game = GameItem::from_db(&game_id, &db).await?;
@@ -93,17 +129,23 @@ mod tests {
         assert_eq!(session.game_id.unwrap(), game_id);
         assert_eq!(session.modified_action, SessionAction::JoinGame);
         assert!(session.modified_at > start_time);
+
+        // Publishes event
+        let event_publisher = event_publisher::get().await;
+        let messages = event_publisher.get_messages("RustLambda-Dev.GameCreated");
+        assert_eq!(messages.len(), 1);
         Ok(())
     }
 
     #[tokio::test]
     async fn does_nothing_if_game_already_exists() -> Result<(), LogicError> {
         test_setup::setup();
-        let db = get_dynamodb_client().await;
+        let db = storage::get().await;
 
         let connection_id = Uuid::new_v4().to_string();
         let session_id = Uuid::new_v4().to_string();
         let mut session = SessionItem::new(&session_id, &connection_id);
+        session.nickname = Some("Test".to_string());
         session.game_id = Some("ABCD".to_string());
         db.write_single(session.save()?).await?;
 

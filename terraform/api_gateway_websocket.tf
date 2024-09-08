@@ -44,7 +44,7 @@ resource "aws_apigatewayv2_deployment" "websocket" {
 resource "aws_lambda_permission" "websocket" {
   statement_id  = "AllowExecutionFromAPIGatewayWebsocket"
   action        = "lambda:InvokeFunction"
-  function_name = local.prefix
+  function_name = "${local.prefix}-HTTP"
   principal     = "apigateway.amazonaws.com"
   source_arn    = "arn:aws:execute-api:${local.region}:${local.aws_account_id}:${aws_apigatewayv2_api.websocket.id}/*/*"
 }

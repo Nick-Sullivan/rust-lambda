@@ -23,7 +23,7 @@ resource "aws_apigatewayv2_integration" "websocket" {
   content_handling_strategy = "CONVERT_TO_TEXT"
   description               = "Lambda connection"
   integration_method        = "POST"
-  integration_uri           = aws_lambda_function.monolith.invoke_arn
+  integration_uri           = aws_lambda_function.http.invoke_arn
 }
 
 resource "aws_apigatewayv2_integration_response" "websocket" {

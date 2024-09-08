@@ -1,5 +1,5 @@
 use crate::attribute_value_parser::parse_attribute_value;
-use crate::dynamodb_client::IDynamoDbClient;
+use crate::IDynamoDbClient;
 use aws_sdk_dynamodb::operation::transact_get_items::builders::TransactGetItemsOutputBuilder;
 use aws_sdk_dynamodb::types::{
     AttributeValue, Delete, ItemResponse, Put, TransactGetItem, TransactWriteItem,

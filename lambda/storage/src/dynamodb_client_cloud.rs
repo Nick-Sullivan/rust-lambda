@@ -1,4 +1,4 @@
-use crate::dynamodb_client::IDynamoDbClient;
+use crate::IDynamoDbClient;
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::{self, BehaviorVersion};
 use aws_sdk_dynamodb::types::{ItemResponse, TransactGetItem, TransactWriteItem};

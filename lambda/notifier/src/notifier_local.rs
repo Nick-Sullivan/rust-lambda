@@ -1,5 +1,6 @@
-use crate::notifier::{INotifier, Message};
+use crate::{INotifier, Message};
 use domain::errors::LogicError;
+use serde_json::json;
 use std::collections::HashMap;
 use std::sync::RwLock;
 
@@ -17,13 +18,24 @@ impl Notifier {
 
 impl INotifier for Notifier {
     async fn notify(&self, connection_id: &str, message: &Message) -> Result<(), LogicError> {
-        let data = serde_json::to_string(message)
+        let message_value = if message.is_error {
+            json!({
+                "action": message.action.to_string(),
+                "error": message.action.get_value()?,
+            })
+        } else {
+            json!({
+                "action": message.action.to_string(),
+                "data": message.action.get_value()?,
+            })
+        };
+        let message_string = serde_json::to_string(&message_value)
             .map_err(|e| LogicError::SerializationError(e.to_string()))?;
         let mut hash_map = self.log.write().unwrap();
         match hash_map.get_mut(connection_id) {
-            Some(log) => log.push(data),
+            Some(log) => log.push(message_string),
             None => {
-                hash_map.insert(connection_id.to_string(), vec![data]);
+                hash_map.insert(connection_id.to_string(), vec![message_string]);
             }
         }
         Ok(())

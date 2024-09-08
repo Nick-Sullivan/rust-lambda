@@ -1,18 +1,15 @@
 use chrono::Utc;
 use domain::commands::CreateSessionCommand;
 use domain::errors::LogicError;
-use notifier::dependency_injection::get_notifier;
-use notifier::notifier::{ActionType, INotifier, Message};
-use serde_json::json;
-use storage::dependency_injection::get_dynamodb_client;
-use storage::dynamodb_client::IDynamoDbClient;
+use notifier::{self, ActionType, INotifier, Message};
 use storage::session_table::SessionItem;
 use storage::websocket_table::WebsocketItem;
+use storage::IDynamoDbClient;
 use uuid::Uuid;
 
 pub async fn handler(command: &CreateSessionCommand) -> Result<String, LogicError> {
-    let db = get_dynamodb_client().await;
-    let notifier = get_notifier().await;
+    let db = storage::get().await;
+    let notifier = notifier::get().await;
 
     let mut connection = WebsocketItem::from_db(&command.connection_id, &db).await?;
     let session_id = match connection.session_id {
@@ -28,7 +25,7 @@ pub async fn handler(command: &CreateSessionCommand) -> Result<String, LogicErro
         }
     };
 
-    let message = Message::new(ActionType::GetSession, json!(session_id.clone()));
+    let message = Message::new(ActionType::GetSession(session_id.clone()));
     notifier.notify(&connection.connection_id, &message).await?;
     Ok(session_id)
 }
@@ -37,7 +34,6 @@ pub async fn handler(command: &CreateSessionCommand) -> Result<String, LogicErro
 mod tests {
     use super::*;
     use crate::test_setup;
-    use notifier::dependency_injection::get_notifier;
     use storage::session_table::SessionAction;
 
     #[tokio::test]
@@ -52,7 +48,7 @@ mod tests {
     #[tokio::test]
     async fn creates_new_session() -> Result<(), LogicError> {
         test_setup::setup();
-        let db = get_dynamodb_client().await;
+        let db = storage::get().await;
         let start_time = Utc::now();
 
         let connection_id = Uuid::new_v4().to_string();
@@ -68,7 +64,7 @@ mod tests {
         assert!(result.is_ok(), "Error: {:?}", result.err());
 
         // Notifies the connection
-        let notifier = get_notifier().await;
+        let notifier = notifier::get().await;
         let messages = notifier.get_messages(&connection_id);
         assert_eq!(messages.len(), 1);
 
@@ -92,7 +88,7 @@ mod tests {
     #[tokio::test]
     async fn reuses_session_if_it_already_exists() -> Result<(), LogicError> {
         test_setup::setup();
-        let db = get_dynamodb_client().await;
+        let db = storage::get().await;
 
         let connection_id = Uuid::new_v4().to_string();
         let session_id = Uuid::new_v4().to_string();
