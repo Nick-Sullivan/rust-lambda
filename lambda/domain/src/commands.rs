@@ -49,6 +49,12 @@ pub struct LeaveGameCommand {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct NewRoundCommand {
+    pub connection_id: String,
+    pub session_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SendGameStateNotificationCommand {
     pub game_id: String,
 }

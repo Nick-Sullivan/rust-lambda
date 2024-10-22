@@ -71,6 +71,20 @@ impl DestroyConnectionRequest {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct NewRoundRequest {
+    #[serde(rename = "sessionId")]
+    pub session_id: String,
+}
+impl NewRoundRequest {
+    pub fn to_command(&self, connection_id: &str) -> commands::NewRoundCommand {
+        commands::NewRoundCommand {
+            connection_id: connection_id.to_string(),
+            session_id: self.session_id.clone(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SetNicknameRequest {
     #[serde(rename = "accountId")]
     pub account_id: Option<String>,

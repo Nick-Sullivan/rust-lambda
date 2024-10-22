@@ -7,6 +7,7 @@ pub enum RequestType {
     CreateGame(requests::CreateGameRequest),
     CreateSession(requests::CreateSessionRequest),
     Disconnect(requests::DestroyConnectionRequest),
+    NewRound(requests::NewRoundRequest),
     SetNickname(requests::SetNicknameRequest),
     SetSession(requests::SetSessionRequest),
 }
@@ -35,6 +36,11 @@ pub fn get_request_type(route_key: &str, body_str: &str) -> Result<RequestType, 
             let request: requests::CreateSessionRequest = serde_json::from_value(request.data)
                 .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
             Ok(RequestType::CreateSession(request))
+        }
+        "newRound" => {
+            let request: requests::NewRoundRequest = serde_json::from_value(request.data)
+                .map_err(|e| LogicError::DeserializationError(e.to_string()))?;
+            Ok(RequestType::NewRound(request))
         }
         "setNickname" => {
             let request: requests::SetNicknameRequest = serde_json::from_value(request.data)
@@ -67,6 +73,10 @@ pub async fn route(request_type: &RequestType, connection_id: &str) -> Result<St
         RequestType::Disconnect(request) => {
             let command = request.to_command(connection_id);
             service::destroy_connection::handler(&command).await
+        }
+        RequestType::NewRound(request) => {
+            let command = request.to_command(connection_id);
+            service::new_round::handler(&command).await
         }
         RequestType::SetNickname(request) => {
             let command = request.to_command(connection_id);
