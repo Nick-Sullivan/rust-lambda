@@ -4,6 +4,7 @@ pub mod create_game;
 pub mod create_session;
 pub mod destroy_connection;
 pub mod destroy_session;
+pub mod finish_round;
 pub mod goodbye;
 pub mod hello;
 pub mod leave_game;

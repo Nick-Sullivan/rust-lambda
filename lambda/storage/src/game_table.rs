@@ -20,6 +20,59 @@ pub enum GameAction {
     StopSpectating,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum DiceType {
+    D4,
+    D6,
+    D8,
+    D10,
+    D12,
+    D20,
+    D10Percentile,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum RollResultType {
+    #[serde(rename = "0")]
+    None,
+    #[serde(rename = "1")]
+    Loser,
+    #[serde(rename = "2")]
+    NoChange,
+    #[serde(rename = "3")]
+    Winner,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum RollResultNote {
+    #[serde(rename = "")]
+    None,
+    #[serde(rename = "DUAL_WIELD")]
+    DualWield,
+    #[serde(rename = "HEAD_ON_TABLE")]
+    HeadOnTable,
+    #[serde(rename = "FINISH_DRINK")]
+    FinishDrink,
+    #[serde(rename = "POOL")]
+    Pool,
+    #[serde(rename = "SIP_DRINK")]
+    SipDrink,
+    #[serde(rename = "SHOWER")]
+    Shower,
+    #[serde(rename = "THREE_WAY_TIE")]
+    ThreeWayTie,
+    #[serde(rename = "TIE")]
+    Tie,
+    #[serde(rename = "UH_OH")]
+    UhOh,
+    #[serde(rename = "WINNER")]
+    Winner,
+    #[serde(rename = "WISH_PURCHASE")]
+    WishPurchase,
+    #[serde(rename = "COCKRING_HANDS")]
+    CockringHands,
+}
+
 impl GameAction {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -49,6 +102,46 @@ impl GameAction {
     }
 }
 
+#[derive(Clone, Deserialize, Debug, Serialize, PartialEq)]
+pub struct DiceItem {
+    #[serde(rename = "id")]
+    pub dice_type: DiceType,
+    pub value: i32,
+    pub is_death_dice: bool,
+}
+impl DiceItem {
+    pub fn new(dice_type: DiceType, value: i32) -> Self {
+        DiceItem {
+            dice_type,
+            value,
+            is_death_dice: false,
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct RollItem {
+    pub dice: Vec<DiceItem>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct RollResultItem {
+    pub note: RollResultNote,
+    #[serde(rename = "type")]
+    pub result_type: RollResultType,
+    pub turn_finished: bool,
+}
+
+impl RollResultItem {
+    pub fn new(note: RollResultNote, result_type: RollResultType, turn_finished: bool) -> Self {
+        RollResultItem {
+            note,
+            result_type,
+            turn_finished,
+        }
+    }
+}
+
 #[derive(Clone, Deserialize, Serialize)]
 pub struct PlayerItem {
     pub player_id: String,
@@ -56,8 +149,9 @@ pub struct PlayerItem {
     pub nickname: String,
     pub win_counter: i32,
     pub finished: bool,
-    // pub outcome: RollResultNote,
-    // pub rolls: Vec<i32>,
+    pub outcome: RollResultNote,
+    pub outcome_type: RollResultType,
+    pub rolls: Vec<RollItem>,
     // pub connection_status: ConnectionStatus,
 }
 
@@ -68,6 +162,9 @@ impl PlayerItem {
             account_id: account_id.clone(),
             nickname: nickname.to_string(),
             win_counter: 0,
+            rolls: Vec::new(),
+            outcome: RollResultNote::None,
+            outcome_type: RollResultType::None,
             finished: false,
         }
     }

@@ -55,6 +55,12 @@ pub struct NewRoundCommand {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct RollDiceCommand {
+    pub connection_id: String,
+    pub session_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SendGameStateNotificationCommand {
     pub game_id: String,
 }

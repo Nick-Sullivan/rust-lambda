@@ -7,7 +7,7 @@ mod tests {
     use domain::commands::LeaveGameCommand;
     use domain::errors::LogicError;
     use service::leave_game::handler;
-    use storage::game_table::{GameAction, GameItem};
+    use storage::game_table::{GameAction, GameItem, RollResultType};
     use storage::IDynamoDbClient;
     use storage::{
         game_table::{PlayerItem, RollResultNote},
@@ -76,6 +76,7 @@ mod tests {
             win_counter: 0,
             rolls: Vec::new(),
             outcome: RollResultNote::None,
+            outcome_type: RollResultType::None,
             finished: true,
         });
         let session1 = SessionItem::new(&session_id1, &connection_id);
