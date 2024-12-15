@@ -33,7 +33,7 @@ pub struct PlayerStateMessage {
 pub struct GameStateMessage {
     #[serde(rename = "gameId")]
     pub game_id: String,
-    pub players: Vec<PlayerStateMessage>,
+    // pub players: Vec<PlayerStateMessage>,
     // pub spectators: Vec<SpectatorStateMessage>,
     pub round: RoundStateMessage,
 }

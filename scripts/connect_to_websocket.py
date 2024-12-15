@@ -4,7 +4,7 @@ import json
 
 
 def main():
-    CLOUD_URL = "wss://1ttz6r0ig9.execute-api.eu-west-2.amazonaws.com/production"
+    CLOUD_URL = "wss://bgxmeyu48f.execute-api.eu-west-2.amazonaws.com/production"
     # LOCAL_URL = "ws://127.0.0.1:8080/ws/"
     asyncio.run(run_tests(CLOUD_URL))
 

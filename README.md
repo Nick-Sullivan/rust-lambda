@@ -1,5 +1,5 @@
-
 # How this was made
+
 rust-analyzer, CodeLLDB
 
 ```bash
@@ -18,6 +18,7 @@ terraform init
 # Run
 
 ```bash
+cd lambda
 cargo build
 cargo lambda watch --only-lambda-apis
 # Run debugger in VSCode
@@ -40,7 +41,7 @@ terraform apply
 # Other
 
 cargo lambda build --release --output-format zip
-cargo lambda deploy --binary-name rust_lambda RustLambda-Dev-Hello --iam-role arn:aws:iam::314077822992:role/RustLambda-Dev-Hello 
+cargo lambda deploy --binary-name rust_lambda RustLambda-Dev-Hello --iam-role arn:aws:iam::314077822992:role/RustLambda-Dev-Hello
 
-podman build -t rust_lambda .
-podman run --rm -p 9001:9001 -e AWS_LAMBDA_FUNCTION_NAME="_" -e AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096 -e AWS_LAMBDA_FUNCTION_VERSION=1 -e AWS_LAMBDA_RUNTIME_API -e AWS_LAMBDA_RUNTIME_API="http://127.0.0.1:9000/.rt" rust_lambda
+podman build -t rust*lambda .
+podman run --rm -p 9001:9001 -e AWS_LAMBDA_FUNCTION_NAME="*" -e AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096 -e AWS_LAMBDA_FUNCTION_VERSION=1 -e AWS_LAMBDA_RUNTIME_API -e AWS_LAMBDA_RUNTIME_API="http://127.0.0.1:9000/.rt" rust_lambda

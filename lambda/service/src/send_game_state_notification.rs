@@ -9,23 +9,23 @@ pub async fn handler(command: &SendGameStateNotificationCommand) -> Result<Strin
 
     let game = GameItem::from_db(&command.game_id, &db).await?;
 
-    let player_message = game
-        .players
-        .iter()
-        .map(|p| PlayerStateMessage {
-            id: p.player_id.clone(),
-            nickname: p.nickname.clone(),
-            turn_finished: p.turn_finished,
-            win_count: p.win_count,
-            roll_result: p.roll_result.clone(),
-            connection_status: p.connection_status.clone(),
-            roll_total: p.roll_total,
-            dice_value: p.dice_value.clone(),
-        })
-        .collect::<Vec<_>>();
+    // let player_message = game
+    //     .players
+    //     .iter()
+    //     .map(|p| PlayerStateMessage {
+    //         id: p.player_id.clone(),
+    //         nickname: p.nickname.clone(),
+    //         turn_finished: p.turn_finished,
+    //         win_count: p.win_count,
+    //         roll_result: p.roll_result.clone(),
+    //         connection_status: p.connection_status.clone(),
+    //         roll_total: p.roll_total,
+    //         dice_value: p.dice_value.clone(),
+    //     })
+    //     .collect::<Vec<_>>();
     let game_message = GameStateMessage {
         game_id: game.game_id.clone(),
-        players: player_message,
+        // players: player_message,
         round: RoundStateMessage {
             complete: game.round_finished,
         },
