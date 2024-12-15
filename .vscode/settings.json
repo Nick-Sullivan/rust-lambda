@@ -8,4 +8,7 @@
     ],
     "tasks.autoDetect": "off",
     "tasks.runOnFolderOpen": true,
+    "rust-analyzer.cargo.extraEnv": {
+        // "RUSTFLAGS": "-A dead_code"
+    }
 }

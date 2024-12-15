@@ -29,7 +29,8 @@ async fn handler(event: LambdaEvent<SqsEvent>) -> Result<Value, Error> {
         let command = CheckSessionTimeoutCommand {
             session_id: session_id.to_string(),
         };
-        service::check_session_timeout::handler(&command).await?;
+        let message = service::check_session_timeout::handler(&command).await?;
+        println!("Message: {:?}", message);
     }
     Ok(json!({"hello": "world"}))
 }

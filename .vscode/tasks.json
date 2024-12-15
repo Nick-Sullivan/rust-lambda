@@ -1,0 +1,43 @@
+// {
+//     "version": "2.0.0",
+//     "tasks": [
+//         {
+//             "label": "cargo test",
+//             "type": "shell",
+//             "command": "cargo",
+//             "args": [
+//                 "test",
+//                 "--no-run"
+//             ],
+//             // "group": {
+//             //     "kind": "build",
+//             //     "isDefault": true
+//             // },
+//             "problemMatcher": [
+//                 "$rustc"
+//             ],
+//             "options": {
+//                 "cwd": "${workspaceFolder}/lambda"
+//             },
+//         },
+//         {
+//             "label": "cargo lambda",
+//             "type": "shell",
+//             "command": "cargo lambda start",
+//             "args": [
+//                 "--target-dir",
+//                 "${workspaceFolder}/target",
+//                 "--cargo-target",
+//                 "x86_64-unknown-linux-musl"
+//             ],
+//             "options": {
+//                 "cwd": "${workspaceFolder}"
+//             },
+//             "problemMatcher": [],
+//             "group": {
+//                 "kind": "build",
+//                 "isDefault": true
+//             }
+//         }
+//     ]
+// }
